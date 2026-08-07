@@ -2,6 +2,8 @@
 
 [English](README.md) | [简体中文](README_zh.md) | [日本語](README_ja.md) | [한국어](README_ko.md)
 
+- [LingKuma for Calibre](https://github.com/white-ink-cell/lingkuma-calibre)
+
 An unofficial Zotero desktop port of **LingKuma 1.1.0**. It brings LingKuma's highlighting, word lookup, translation / AI, sentence analysis, vocabulary, TTS, and light/dark themes into Zotero's PDF and EPUB reading environment.
 
 > **Zotero port published / maintained by [`white-ink-cell`](https://github.com/white-ink-cell)**  
