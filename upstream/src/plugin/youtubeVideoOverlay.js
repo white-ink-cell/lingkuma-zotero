@@ -1,0 +1,2840 @@
+// ==UserScript==
+// @name         YouTube 视频覆盖层
+// @namespace    http://tampermonkey.net/
+// @version      0.3
+// @description  在 YouTube 页面上创建白色覆盖层，并在其中显示原视频，支持字幕显示和多种显示模式
+// @author       You
+// @match        https://www.youtube.com/watch*
+// @grant        none
+// @run-at       document-idle
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    const FLOAT_BUTTON_POSITION_KEY = 'youtubeOverlayFloatButtonPosition';
+    const FLOAT_BUTTON_ROOT_ID = 'youtube-overlay-float-button-root';
+    const FLOAT_EDGE_THRESHOLD = 35;
+    const FLOAT_BUTTON_WIDTH = 86;
+    const FLOAT_BUTTON_HEIGHT = 34;
+    const FLOAT_BUTTON_FRAME_HEIGHT = Math.max(FLOAT_BUTTON_HEIGHT, FLOAT_BUTTON_WIDTH);
+    const FLOAT_DOCK_VISIBLE_SIZE = 28;
+    const FLOAT_SIDE_DOCK_OFFSET = FLOAT_BUTTON_WIDTH - FLOAT_DOCK_VISIBLE_SIZE;
+
+    let overlayContainer = null;
+    let videoContainer = null;
+    let originalVideo = null;
+    let originalParent = null;
+    let isOverlayActive = false;
+    let currentUrl = window.location.href;
+    let floatButton = null;
+    let floatButtonHost = null;
+    let floatButtonShadowRoot = null;
+    let floatButtonStack = null;
+    let currentFloatButtonPosition = null;
+    let floatButtonPointerState = null;
+
+    let subtitles = [];
+    let rebuiltSubtitles = [];
+    let currentSubtitleIndex = -1;
+    let isReplayMode = false;
+    let currentSubtitleInheiten = '';
+    let isProgramTriggeredPlay = false;
+    let isAIRequesting = false;
+    let lastRequestTime = 0;
+    let lastDisplayedTimestamp = -1;
+    let cachedSegments = {};
+    let videoElement = null;
+    let lastSubtitleText = '';
+    let skipSubtitleRefresh = false;
+    let subtitleUpdateInterval = null;
+    let autoPauseEnabled = false;
+    let currentDisplayMode = 'theater';
+    let isMobileMode = false;
+    let keydownHandler = null;
+    let playHandler = null;
+    let lastOverlaySubtitleText = '';
+    let subtitleListInitialized = false;
+    let subtitleListItems = [];
+    let subtitleOffsetMode = 'normal';
+    let readingSubtitleAutoFollow = true;
+
+    function isYouTubePage() {
+        return window.location.hostname.includes('youtube.com');
+    }
+
+    const YOUTUBE_OVERLAY_UI = {
+        nearBlack: '#141413',
+        darkSurface: '#30302e',
+        parchment: '#f5f4ed',
+        ivory: '#faf9f5',
+        warmSand: '#e8e6dc',
+        borderCream: '#f0eee6',
+        borderWarm: '#e8e6dc',
+        ringWarm: '#d1cfc5',
+        ringDeep: '#c2c0b6',
+        terracotta: '#c96442',
+        coral: '#d97757',
+        charcoal: '#4d4c48',
+        olive: '#5e5d59',
+        stone: '#87867f',
+        warmSilver: '#b0aea5'
+    };
+
+    function youtubeOverlayIcon(name, size = 18) {
+        const attrs = 'width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"';
+        const icons = {
+            close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+            pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+            play: '<path d="m8 5 11 7-11 7Z"/>',
+            skipBack: '<path d="m19 20-11-8 11-8v16Z"/><path d="M5 19V5"/>',
+            skipForward: '<path d="m5 4 11 8-11 8V4Z"/><path d="M19 5v14"/>',
+            replay: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/>',
+            layout: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M12 10v10"/>',
+            clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+            settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.07a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.53-1H3v-4h.07A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.97 4.6 1.7 1.7 0 0 0 10 3.07V3h4v.07a1.7 1.7 0 0 0 1.03 1.53 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9 1.7 1.7 0 0 0 20.93 10H21v4h-.07a1.7 1.7 0 0 0-1.53 1Z"/>',
+            autoPause: '<circle cx="12" cy="12" r="9"/><path d="M10 8v8"/><path d="M14 8v8"/>'
+        };
+        return '<svg ' + attrs + '>' + (icons[name] || icons.play) + '</svg>';
+    }
+
+    function setWarmButtonState(button, active = false) {
+        if (!button) return;
+        button.dataset.active = active ? 'true' : 'false';
+        Object.assign(button.style, {
+            backgroundColor: active ? YOUTUBE_OVERLAY_UI.terracotta : YOUTUBE_OVERLAY_UI.warmSand,
+            color: active ? YOUTUBE_OVERLAY_UI.ivory : YOUTUBE_OVERLAY_UI.charcoal,
+            boxShadow: active ? '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.terracotta + ', 0 8px 22px rgba(201, 100, 66, 0.22)' : '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.ringWarm
+        });
+    }
+
+    function styleControlBar(controlBar) {
+        if (!controlBar) return;
+        Object.assign(controlBar.style, {
+            position: 'fixed',
+            bottom: '18px',
+            left: '50%',
+            right: 'auto',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            padding: '10px 12px',
+            backgroundColor: YOUTUBE_OVERLAY_UI.ivory,
+            border: '1px solid ' + YOUTUBE_OVERLAY_UI.borderWarm,
+            borderRadius: '16px',
+            boxShadow: '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.borderCream + ', 0 12px 34px rgba(20, 20, 19, 0.12)',
+            zIndex: '114514',
+            boxSizing: 'border-box'
+        });
+    }
+    function getDefaultFloatButtonPosition() {
+        return {
+            x: Math.max(0, window.innerWidth - FLOAT_BUTTON_WIDTH - 20),
+            y: Math.max(80, Math.round((window.innerHeight - FLOAT_BUTTON_FRAME_HEIGHT) * 0.5)),
+            dock: 'none'
+        };
+    }
+
+    function normalizeFloatButtonPosition(position) {
+        const fallback = getDefaultFloatButtonPosition();
+        const maxX = Math.max(0, window.innerWidth - FLOAT_BUTTON_WIDTH);
+        const maxY = Math.max(0, window.innerHeight - FLOAT_BUTTON_FRAME_HEIGHT);
+
+        return {
+            x: Math.min(Math.max(Number(position?.x ?? fallback.x), 0), maxX),
+            y: Math.min(Math.max(Number(position?.y ?? fallback.y), 0), maxY),
+            dock: ['left', 'right', 'top', 'bottom', 'none'].includes(position?.dock) ? position.dock : 'none'
+        };
+    }
+
+    function getFloatButtonHostPosition(savedPosition) {
+        const host = location.hostname || 'local';
+        if (savedPosition && savedPosition.host === host && savedPosition.position) {
+            return normalizeFloatButtonPosition(savedPosition.position);
+        }
+        return getDefaultFloatButtonPosition();
+    }
+
+    function saveFloatButtonPosition() {
+        if (!currentFloatButtonPosition) {
+            return;
+        }
+
+        chrome.storage.local.set({
+            [FLOAT_BUTTON_POSITION_KEY]: {
+                host: location.hostname || 'local',
+                position: currentFloatButtonPosition
+            }
+        });
+    }
+
+    function applyFloatButtonPosition(position) {
+        if (!floatButtonStack) {
+            return;
+        }
+
+        currentFloatButtonPosition = normalizeFloatButtonPosition(position);
+        floatButtonStack.style.left = `${currentFloatButtonPosition.x}px`;
+        floatButtonStack.style.top = `${currentFloatButtonPosition.y}px`;
+        floatButtonStack.dataset.dock = currentFloatButtonPosition.dock;
+    }
+
+    function snapFloatButtonToEdge(position) {
+        const maxX = Math.max(0, window.innerWidth - FLOAT_BUTTON_WIDTH);
+        const maxY = Math.max(0, window.innerHeight - FLOAT_BUTTON_FRAME_HEIGHT);
+        const distances = [
+            { edge: 'left', value: position.x },
+            { edge: 'right', value: maxX - position.x },
+            { edge: 'top', value: position.y },
+            { edge: 'bottom', value: maxY - position.y }
+        ].sort((a, b) => a.value - b.value);
+
+        const closest = distances[0];
+        const nextPosition = normalizeFloatButtonPosition(position);
+
+        if (closest.value > FLOAT_EDGE_THRESHOLD) {
+            nextPosition.dock = 'none';
+            return nextPosition;
+        }
+
+        nextPosition.dock = closest.edge;
+        if (closest.edge === 'left') {
+            nextPosition.x = 0;
+        } else if (closest.edge === 'right') {
+            nextPosition.x = maxX;
+        } else if (closest.edge === 'top') {
+            nextPosition.y = 0;
+        } else if (closest.edge === 'bottom') {
+            nextPosition.y = maxY;
+        }
+
+        return nextPosition;
+    }
+
+    function triggerFloatButtonPulse() {
+        if (!floatButton) {
+            return;
+        }
+
+        floatButton.dataset.pulse = 'true';
+        window.setTimeout(() => {
+            if (floatButton) {
+                delete floatButton.dataset.pulse;
+            }
+        }, 280);
+    }
+
+    function toggleOverlayFromFloatButton() {
+        triggerFloatButtonPulse();
+        if (isOverlayActive) {
+            cleanupOverlay();
+        } else {
+            initializeOverlay();
+        }
+    }
+
+    function randomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1) + min);
+    }
+
+    function initializeFloatButtonStars() {
+        if (!floatButton) {
+            return;
+        }
+
+        floatButton.querySelectorAll('.star').forEach((star) => {
+            star.style.setProperty('--angle', randomInt(0, 360));
+            star.style.setProperty('--duration', randomInt(6, 20));
+            star.style.setProperty('--delay', randomInt(1, 10));
+            star.style.setProperty('--alpha', randomInt(40, 90) / 100);
+            star.style.setProperty('--size', randomInt(2, 6));
+            star.style.setProperty('--distance', randomInt(40, 200));
+        });
+    }
+
+    function createFloatButtonStyles() {
+        const style = document.createElement('style');
+        style.textContent = `
+            :host {
+                all: initial;
+                --transition: 0.25s;
+                --dock-motion: 470ms cubic-bezier(0.16, 1, 0.3, 1);
+                --spark: 1.8s;
+                --hue: 245;
+                font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            }
+
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+            }
+
+            .lk-youtube-sync-stack {
+                position: fixed;
+                width: ${FLOAT_BUTTON_WIDTH}px;
+                height: ${FLOAT_BUTTON_FRAME_HEIGHT}px;
+                z-index: 2147483647;
+                transform: translate3d(0, 0, 0);
+                transform-origin: center;
+                transition:
+                    width var(--dock-motion),
+                    height var(--dock-motion);
+            }
+
+            .lk-youtube-sync-stack[data-dock="top"],
+            .lk-youtube-sync-stack[data-dock="bottom"] {
+                width: ${FLOAT_BUTTON_FRAME_HEIGHT}px;
+                height: ${FLOAT_BUTTON_WIDTH}px;
+            }
+
+            .lk-youtube-sync-slot {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: ${FLOAT_BUTTON_WIDTH}px;
+                height: ${FLOAT_BUTTON_HEIGHT}px;
+                opacity: 0.88;
+                transform: translate3d(0, 0, 0);
+                transform-origin: center;
+                transition:
+                    opacity 180ms ease,
+                    transform var(--dock-motion),
+                    top var(--dock-motion),
+                    left var(--dock-motion),
+                    width var(--dock-motion),
+                    height var(--dock-motion);
+            }
+
+            .lk-youtube-sync-stack[data-dock="left"] .lk-youtube-sync-slot {
+                opacity: 0.42;
+                transform: translate3d(-${FLOAT_SIDE_DOCK_OFFSET}px, 0, 0);
+            }
+
+            .lk-youtube-sync-stack[data-dock="right"] .lk-youtube-sync-slot {
+                opacity: 0.42;
+                transform: translate3d(${FLOAT_SIDE_DOCK_OFFSET}px, 0, 0);
+            }
+
+            .lk-youtube-sync-stack[data-dock="top"] .lk-youtube-sync-slot,
+            .lk-youtube-sync-stack[data-dock="bottom"] .lk-youtube-sync-slot {
+                width: ${FLOAT_BUTTON_HEIGHT}px;
+                height: ${FLOAT_BUTTON_WIDTH}px;
+                opacity: 0.42;
+            }
+
+            .lk-youtube-sync-stack[data-dock="top"] .lk-youtube-sync-slot {
+                top: 0;
+                transform: translate3d(0, -${FLOAT_SIDE_DOCK_OFFSET}px, 0);
+            }
+
+            .lk-youtube-sync-stack[data-dock="bottom"] .lk-youtube-sync-slot {
+                top: 0;
+                transform: translate3d(0, ${FLOAT_SIDE_DOCK_OFFSET}px, 0);
+            }
+
+            .lk-youtube-sync-stack[data-dock="left"] .lk-youtube-sync-slot:hover,
+            .lk-youtube-sync-stack[data-dock="left"] .lk-youtube-sync-slot:focus-within,
+            .lk-youtube-sync-stack[data-dock="right"] .lk-youtube-sync-slot:hover,
+            .lk-youtube-sync-stack[data-dock="right"] .lk-youtube-sync-slot:focus-within,
+            .lk-youtube-sync-stack[data-dock="top"] .lk-youtube-sync-slot:hover,
+            .lk-youtube-sync-stack[data-dock="top"] .lk-youtube-sync-slot:focus-within,
+            .lk-youtube-sync-stack[data-dock="bottom"] .lk-youtube-sync-slot:hover,
+            .lk-youtube-sync-stack[data-dock="bottom"] .lk-youtube-sync-slot:focus-within,
+            .lk-youtube-sync-stack[data-dragging="true"] .lk-youtube-sync-slot {
+                opacity: 0.98;
+                transform: translate3d(0, 0, 0);
+            }
+
+            .lk-youtube-sync {
+                --cut: 0.1em;
+                --active: 0;
+                --bg:
+                    radial-gradient(
+                        120% 120% at 126% 126%,
+                        hsl(var(--hue) calc(var(--active) * 97%) 98% / calc(var(--active) * 0.9)) 40%,
+                        transparent 50%
+                    ) calc(100px - (var(--active) * 100px)) 0 / 100% 100% no-repeat,
+                    radial-gradient(
+                        120% 120% at 120% 120%,
+                        hsl(var(--hue) calc(var(--active) * 97%) 70% / calc(var(--active) * 1)) 30%,
+                        transparent 70%
+                    ) calc(100px - (var(--active) * 100px)) 0 / 100% 100% no-repeat,
+                    hsl(var(--hue) calc(var(--active) * 100%) calc(12% - (var(--active) * 8%)));
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: ${FLOAT_BUTTON_WIDTH}px;
+                height: ${FLOAT_BUTTON_HEIGHT}px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.25em;
+                border: 0;
+                border-radius: 2rem;
+                padding: 0.9em 1.3em;
+                color: hsl(0 0% calc(60% + (var(--active) * 26%)));
+                background: var(--bg);
+                // box-shadow:
+                //   0 0 calc(var(--active) * 6em) calc(var(--active) * 3em) hsl(var(--hue) 97% 61% / 0.5),
+                //   0 0.05em 0 0 hsl(var(--hue) calc(var(--active) * 97%) calc((var(--active) * 50%) + 30%)) inset,
+                //   0 -0.05em 0 0 hsl(var(--hue) calc(var(--active) * 97%) calc(var(--active) * 10%)) inset,
+                //   0 12px 30px rgba(20, 20, 19, 0.18);
+                cursor: grab;
+                font-size: 16px;
+                font-weight: 600;
+                line-height: 1;
+                letter-spacing: 0;
+                white-space: nowrap;
+                opacity: 0.88;
+                transform: translate3d(0, 0, 0);
+                scale: 1;
+                transform-style: preserve-3d;
+                perspective: 100vmin;
+                overflow: hidden;
+                transition:
+                    opacity 180ms ease,
+                    transform var(--dock-motion),
+                    box-shadow var(--transition),
+                    scale var(--transition),
+                    background var(--transition),
+                    color var(--transition);
+                user-select: none;
+                touch-action: none;
+                -webkit-tap-highlight-color: transparent;
+            }
+
+
+            .lk-youtube-sync-stack[data-dock="top"] .lk-youtube-sync {
+                top: ${Math.round((FLOAT_BUTTON_WIDTH - FLOAT_BUTTON_HEIGHT) / 2)}px;
+                left: -${Math.round((FLOAT_BUTTON_WIDTH - FLOAT_BUTTON_HEIGHT) / 2)}px;
+                transform: rotate(-90deg);
+            }
+
+            .lk-youtube-sync-stack[data-dock="bottom"] .lk-youtube-sync {
+                top: ${Math.round((FLOAT_BUTTON_WIDTH - FLOAT_BUTTON_HEIGHT) / 2)}px;
+                left: -${Math.round((FLOAT_BUTTON_WIDTH - FLOAT_BUTTON_HEIGHT) / 2)}px;
+                transform: rotate(90deg);
+            }
+
+            .lk-youtube-sync-stack[data-dragging="true"] .lk-youtube-sync {
+                top: 0;
+                left: 0;
+                transform: translate3d(0, 0, 0);
+            }
+            .lk-youtube-sync:hover:not([data-collapse-after-click="true"]),
+            .lk-youtube-sync:focus-visible,
+            .lk-youtube-sync[data-dragging="true"] {
+                opacity: 0.98;
+            }
+
+            .lk-youtube-sync:focus-visible {
+                outline: 2px solid #3898ec;
+                outline-offset: 3px;
+            }
+
+            .lk-youtube-sync:active {
+                cursor: grabbing;
+            }
+
+            .lk-youtube-sync[data-pulse="true"] {
+                -webkit-animation: lk-button-pop 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+                animation: lk-button-pop 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+            }
+
+            .lk-youtube-sync[data-overlay="on"] {
+                --active: 1;
+                --play-state: running;
+            }
+
+            .lk-youtube-sync[data-overlay="off"] {
+                --active: 0;
+            }
+
+            .spark {
+                position: absolute;
+                inset: 0;
+                border-radius: 2rem;
+                rotate: 0deg;
+                overflow: hidden;
+                -webkit-mask: linear-gradient(white, transparent 50%);
+                mask: linear-gradient(white, transparent 50%);
+                -webkit-animation: flip calc(var(--spark) * 2) infinite steps(2, end);
+                animation: flip calc(var(--spark) * 2) infinite steps(2, end);
+            }
+
+            .spark::before {
+                content: "";
+                position: absolute;
+                width: 200%;
+                aspect-ratio: 1;
+                top: 0%;
+                left: 50%;
+                z-index: -1;
+                translate: -50% -15%;
+                rotate: 0;
+                transform: rotate(-90deg);
+                opacity: calc((var(--active)) + 0.4);
+                background: conic-gradient(
+                    from 0deg,
+                    transparent 0 340deg,
+                    white 360deg
+                );
+                transition: opacity var(--transition);
+                -webkit-animation: rotate var(--spark) linear infinite both;
+                animation: rotate var(--spark) linear infinite both;
+            }
+
+            .spark::after {
+                content: "";
+                position: absolute;
+                inset: var(--cut);
+                border-radius: 2rem;
+            }
+
+            .backdrop {
+                position: absolute;
+                inset: var(--cut);
+                background: var(--bg);
+                border-radius: 2rem;
+                transition: background var(--transition);
+            }
+
+            .galaxy {
+                position: absolute;
+                width: 100%;
+                aspect-ratio: 1;
+                top: 50%;
+                left: 50%;
+                translate: -50% -50%;
+                overflow: hidden;
+                opacity: var(--active);
+                transition: opacity var(--transition);
+            }
+
+            .galaxy__ring {
+                height: 200%;
+                width: 200%;
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                border-radius: 50%;
+                transform: translate(-28%, -40%) rotateX(-24deg) rotateY(-30deg) rotateX(90deg);
+                transform-style: preserve-3d;
+            }
+
+            .galaxy__container {
+                position: absolute;
+                inset: 0;
+                opacity: var(--active);
+                transition: opacity var(--transition);
+                -webkit-mask: radial-gradient(white, transparent);
+                mask: radial-gradient(white, transparent);
+            }
+
+            .star {
+                height: calc(var(--size) * 1px);
+                aspect-ratio: 1;
+                background: white;
+                border-radius: 50%;
+                position: absolute;
+                opacity: var(--alpha);
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%) rotate(10deg) rotate(0deg) translateY(calc(var(--distance) * 1px));
+                -webkit-animation: orbit calc(var(--duration) * 1s) calc(var(--delay) * -1s) infinite linear;
+                animation: orbit calc(var(--duration) * 1s) calc(var(--delay) * -1s) infinite linear;
+            }
+
+            .star--static {
+                -webkit-animation:
+                    move-x calc(var(--duration) * 0.1s) calc(var(--delay) * -0.1s) infinite linear,
+                    move-y calc(var(--duration) * 0.2s) calc(var(--delay) * -0.2s) infinite linear;
+                animation:
+                    move-x calc(var(--duration) * 0.1s) calc(var(--delay) * -0.1s) infinite linear,
+                    move-y calc(var(--duration) * 0.2s) calc(var(--delay) * -0.2s) infinite linear;
+                top: 50%;
+                left: 50%;
+                transform: translate(0, 0);
+                max-height: 4px;
+                filter: brightness(4);
+                opacity: 0.9;
+            }
+
+            .lk-youtube-sync[data-overlay="on"] .star--static {
+                -webkit-animation-play-state: paused;
+                animation-play-state: paused;
+            }
+
+            .text {
+                position: relative;
+                z-index: 1;
+                translate: 2% -6%;
+                color: hsl(0 0% calc(60% + (var(--active) * 26%)));
+                letter-spacing: 0.01ch;
+                transition: color var(--transition);
+                pointer-events: none;
+            }
+
+            @-webkit-keyframes orbit {
+                to {
+                    transform: translate(-50%, -50%) rotate(10deg) rotate(360deg) translateY(calc(var(--distance) * 1px));
+                }
+            }
+
+            @keyframes orbit {
+                to {
+                    transform: translate(-50%, -50%) rotate(10deg) rotate(360deg) translateY(calc(var(--distance) * 1px));
+                }
+            }
+
+            @-webkit-keyframes move-x {
+                0% {
+                    translate: -100px 0;
+                }
+                100% {
+                    translate: 100px 0;
+                }
+            }
+
+            @keyframes move-x {
+                0% {
+                    translate: -100px 0;
+                }
+                100% {
+                    translate: 100px 0;
+                }
+            }
+
+            @-webkit-keyframes move-y {
+                0% {
+                    transform: translate(0, -50px);
+                }
+                100% {
+                    transform: translate(0, 50px);
+                }
+            }
+
+            @keyframes move-y {
+                0% {
+                    transform: translate(0, -50px);
+                }
+                100% {
+                    transform: translate(0, 50px);
+                }
+            }
+
+            @-webkit-keyframes flip {
+                to {
+                    rotate: 360deg;
+                }
+            }
+
+            @keyframes flip {
+                to {
+                    rotate: 360deg;
+                }
+            }
+
+            @-webkit-keyframes rotate {
+                to {
+                    transform: rotate(90deg);
+                }
+            }
+
+            @keyframes rotate {
+                to {
+                    transform: rotate(90deg);
+                }
+            }
+
+            @-webkit-keyframes lk-button-pop {
+                0% {
+                    scale: 1;
+                }
+                45% {
+                    scale: 1.08;
+                }
+                100% {
+                    scale: 1;
+                }
+            }
+
+            @keyframes lk-button-pop {
+                0% {
+                    scale: 1;
+                }
+                45% {
+                    scale: 1.08;
+                }
+                100% {
+                    scale: 1;
+                }
+            }
+        `;
+        return style;
+    }
+
+    function handleFloatButtonPointerDown(event) {
+        if (event.button !== undefined && event.button !== 0) {
+            return;
+        }
+
+        const baseX = currentFloatButtonPosition?.x ?? floatButtonStack.getBoundingClientRect().left;
+        const baseY = currentFloatButtonPosition?.y ?? floatButtonStack.getBoundingClientRect().top;
+        floatButtonPointerState = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            offsetX: event.clientX - baseX,
+            offsetY: event.clientY - baseY,
+            dock: currentFloatButtonPosition?.dock || floatButtonStack.dataset.dock || 'none',
+            moved: false
+        };
+
+        if (floatButtonShadowRoot?.activeElement && floatButtonShadowRoot.activeElement !== floatButton) {
+            floatButtonShadowRoot.activeElement.blur();
+        }
+        delete floatButton.dataset.collapseAfterClick;
+        floatButton.setPointerCapture(event.pointerId);
+        event.preventDefault();
+    }
+
+    function handleFloatButtonPointerMove(event) {
+        if (!floatButtonPointerState || floatButtonPointerState.pointerId !== event.pointerId) {
+            return;
+        }
+
+        const deltaX = Math.abs(event.clientX - floatButtonPointerState.startX);
+        const deltaY = Math.abs(event.clientY - floatButtonPointerState.startY);
+        if (!floatButtonPointerState.moved && (deltaX > 3 || deltaY > 3)) {
+            floatButtonPointerState.moved = true;
+            floatButtonStack.dataset.dragging = 'true';
+            floatButtonStack.dataset.dock = 'none';
+            floatButton.dataset.dragging = 'true';
+            delete floatButton.dataset.collapseAfterClick;
+        }
+
+        if (!floatButtonPointerState.moved) {
+            event.preventDefault();
+            return;
+        }
+
+        const maxX = Math.max(0, window.innerWidth - FLOAT_BUTTON_WIDTH);
+        const maxY = Math.max(0, window.innerHeight - FLOAT_BUTTON_FRAME_HEIGHT);
+        const x = Math.min(Math.max(event.clientX - floatButtonPointerState.offsetX, 0), maxX);
+        const y = Math.min(Math.max(event.clientY - floatButtonPointerState.offsetY, 0), maxY);
+
+        currentFloatButtonPosition = { x, y, dock: 'none' };
+        floatButtonStack.style.left = `${x}px`;
+        floatButtonStack.style.top = `${y}px`;
+        floatButtonStack.dataset.dock = 'none';
+        event.preventDefault();
+    }
+
+    function handleFloatButtonPointerUp(event) {
+        if (!floatButtonPointerState || floatButtonPointerState.pointerId !== event.pointerId) {
+            return;
+        }
+
+        const wasMoved = floatButtonPointerState.moved;
+        const previousDock = floatButtonPointerState.dock;
+        floatButtonPointerState = null;
+        delete floatButtonStack.dataset.dragging;
+        delete floatButton.dataset.dragging;
+
+        try {
+            floatButton.releasePointerCapture(event.pointerId);
+        } catch (error) {
+            // Pointer capture may already be released by the browser.
+        }
+
+        if (wasMoved) {
+            applyFloatButtonPosition(snapFloatButtonToEdge(currentFloatButtonPosition));
+            saveFloatButtonPosition();
+        } else {
+            const dock = currentFloatButtonPosition?.dock || previousDock || 'none';
+            floatButtonStack.dataset.dock = dock;
+            if (dock === 'none') {
+                delete floatButton.dataset.collapseAfterClick;
+            } else {
+                floatButton.dataset.collapseAfterClick = 'true';
+            }
+            toggleOverlayFromFloatButton();
+        }
+
+        event.preventDefault();
+    }
+
+    function handleFloatButtonPointerLeave() {
+        if (floatButton) {
+            delete floatButton.dataset.collapseAfterClick;
+        }
+    }
+
+    function handleFloatButtonKeyDown(event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            toggleOverlayFromFloatButton();
+        }
+    }
+
+    function createFloatButton() {
+        if (floatButtonHost) return;
+
+        if (!isYouTubePage()) {
+            console.log('[LingKuma] Not a YouTube page; skip overlay float button.');
+            return;
+        }
+
+        const existingHost = document.getElementById(FLOAT_BUTTON_ROOT_ID);
+        if (existingHost) {
+            floatButtonHost = existingHost;
+            floatButtonShadowRoot = existingHost.shadowRoot;
+            floatButtonStack = floatButtonShadowRoot?.querySelector('.lk-youtube-sync-stack') || null;
+            floatButton = floatButtonShadowRoot?.getElementById('youtube-overlay-float-button') || null;
+            updateFloatButtonState();
+            return;
+        }
+
+        floatButtonHost = document.createElement('div');
+        floatButtonHost.id = FLOAT_BUTTON_ROOT_ID;
+        floatButtonShadowRoot = floatButtonHost.attachShadow({ mode: 'open' });
+
+        floatButtonStack = document.createElement('div');
+        floatButtonStack.className = 'lk-youtube-sync-stack';
+
+        floatButton = document.createElement('button');
+        floatButton.id = 'youtube-overlay-float-button';
+        floatButton.className = 'lk-youtube-sync';
+        floatButton.type = 'button';
+        floatButton.innerHTML = `
+            <span class="spark" aria-hidden="true"></span>
+            <span class="backdrop" aria-hidden="true"></span>
+            <span class="galaxy__container" aria-hidden="true">
+                <span class="star star--static"></span>
+                <span class="star star--static"></span>
+                <span class="star star--static"></span>
+                <span class="star star--static"></span>
+            </span>
+            <span class="galaxy" aria-hidden="true">
+                <span class="galaxy__ring">
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                    <span class="star"></span>
+                </span>
+            </span>
+            <span class="text">SYNC</span>
+        `;
+
+        const floatButtonSlot = document.createElement('div');
+        floatButtonSlot.className = 'lk-youtube-sync-slot';
+        floatButtonSlot.append(floatButton);
+        floatButtonStack.append(floatButtonSlot);
+        floatButtonShadowRoot.append(createFloatButtonStyles(), floatButtonStack);
+        document.documentElement.appendChild(floatButtonHost);
+
+        floatButton.addEventListener('pointerdown', handleFloatButtonPointerDown);
+        floatButton.addEventListener('pointermove', handleFloatButtonPointerMove);
+        floatButton.addEventListener('pointerup', handleFloatButtonPointerUp);
+        floatButton.addEventListener('pointercancel', handleFloatButtonPointerUp);
+        floatButton.addEventListener('pointerleave', handleFloatButtonPointerLeave);
+        floatButton.addEventListener('keydown', handleFloatButtonKeyDown);
+
+        initializeFloatButtonStars();
+        applyFloatButtonPosition(getDefaultFloatButtonPosition());
+        chrome.storage.local.get({ [FLOAT_BUTTON_POSITION_KEY]: null }, (result) => {
+            applyFloatButtonPosition(getFloatButtonHostPosition(result[FLOAT_BUTTON_POSITION_KEY]));
+        });
+        updateFloatButtonState();
+    }
+
+    function updateFloatButtonVisibility() {
+        if (!floatButtonHost) return;
+
+        if (isYouTubePage()) {
+            floatButtonHost.style.display = '';
+        } else {
+            floatButtonHost.style.display = 'none';
+        }
+    }
+
+    function updateFloatButtonState() {
+        if (!floatButton) return;
+        if (isOverlayActive) {
+            floatButton.dataset.overlay = 'on';
+            floatButton.setAttribute('aria-label', 'YouTube overlay is on. Click to turn off.');
+            floatButton.setAttribute('title', 'YouTube overlay: On');
+            floatButton.setAttribute('aria-pressed', 'true');
+        } else {
+            floatButton.dataset.overlay = 'off';
+            floatButton.setAttribute('aria-label', 'YouTube overlay is off. Click to turn on.');
+            floatButton.setAttribute('title', 'YouTube overlay: Off');
+            floatButton.setAttribute('aria-pressed', 'false');
+        }
+    }
+    window.addEventListener('resize', () => {
+        if (!currentFloatButtonPosition || !floatButton) {
+            return;
+        }
+        applyFloatButtonPosition(currentFloatButtonPosition);
+        saveFloatButtonPosition();
+    });
+
+    chrome.storage.local.get({
+        youtubeVideoOverlay: false,
+        youtubeDisplayMode: 'theater',
+        youtubeCommaSentencing: false,
+        youtubeSubtitleOffset: 'normal',
+        youtubeReadingSubtitleAutoFollow: true
+    }, function(result) {
+        readingSubtitleAutoFollow = result.youtubeReadingSubtitleAutoFollow !== false;
+        if (result.youtubeVideoOverlay) {
+            console.log("YouTube 视频覆盖层已启用");
+            currentDisplayMode = result.youtubeDisplayMode || 'theater';
+            window.youtubeCommaSentencingEnabled = result.youtubeCommaSentencing || false;
+            subtitleOffsetMode = result.youtubeSubtitleOffset || 'normal';
+            initializeOverlay();
+            setupUrlMonitoring();
+        }
+        createFloatButton();
+    });
+
+    function initializeOverlay() {
+        if (!window.location.href.includes('/watch') || !window.location.href.includes('v=')) {
+            console.log("不是视频页面，跳过初始化");
+            return;
+        }
+
+        cleanupOverlay();
+
+        waitForElement('#movie_player', createOverlay, 100, 30000);
+    }
+
+    function cleanupOverlay() {
+        stopSubtitleUpdate();
+
+        if (overlayContainer) {
+            overlayContainer.remove();
+            overlayContainer = null;
+        }
+
+        const closeButton = document.getElementById('overlay-close-button');
+        if (closeButton) {
+            closeButton.remove();
+        }
+
+        const controlBar = document.getElementById('overlay-control-bar');
+        if (controlBar) {
+            controlBar.remove();
+        }
+
+        const settingsSelector = document.getElementById('overlay-settings-selector');
+        if (settingsSelector) {
+            settingsSelector.remove();
+        }
+
+        if (keydownHandler) {
+            document.removeEventListener('keydown', keydownHandler);
+            keydownHandler = null;
+        }
+
+        if (playHandler) {
+            const video = getVideoElement();
+            if (video) {
+                video.removeEventListener('play', playHandler);
+            }
+            playHandler = null;
+        }
+
+        if (originalVideo && originalParent) {
+            originalParent.appendChild(originalVideo);
+            originalVideo.style.display = '';
+            originalVideo = null;
+            originalParent = null;
+        }
+
+        document.body.style.overflow = '';
+        isOverlayActive = false;
+        chrome.storage.local.set({ youtubeVideoOverlay: false });
+        updateFloatButtonState();
+    }
+
+    function setupUrlMonitoring() {
+        setInterval(() => {
+            const newUrl = window.location.href;
+            if (newUrl !== currentUrl) {
+                console.log("检测到URL变化:", currentUrl, "->", newUrl);
+                currentUrl = newUrl;
+                setTimeout(() => {
+                    initializeOverlay();
+                }, 1500);
+            }
+            updateFloatButtonVisibility();
+        }, 1000);
+    }
+
+    function waitForElement(selector, callback, checkFrequencyInMs, timeoutInMs) {
+        var startTimeInMs = Date.now();
+        (function loopSearch() {
+            if (document.querySelector(selector) != null) {
+                callback();
+                return;
+            } else {
+                setTimeout(function () {
+                    if (timeoutInMs && Date.now() - startTimeInMs > timeoutInMs) {
+                        return;
+                    }
+                    loopSearch();
+                }, checkFrequencyInMs);
+            }
+        })();
+    }
+
+    function createOverlay() {
+        console.log("创建 YouTube 视频覆盖层...");
+
+        const videoElement = document.querySelector('video');
+        if (!videoElement) {
+            console.log("未找到视频元素");
+            return;
+        }
+
+        originalVideo = videoElement;
+        originalParent = videoElement.parentElement;
+
+        const overlay = document.createElement('div');
+        overlay.id = 'youtube-video-overlay';
+        Object.assign(overlay.style, {
+            position: 'fixed',
+            top: '0',
+            left: '0',
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: YOUTUBE_OVERLAY_UI.parchment,
+            color: YOUTUBE_OVERLAY_UI.nearBlack,
+            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif',
+            zIndex: '114513',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden'
+        });
+
+        const closeButton = document.createElement('button');
+        closeButton.id = 'overlay-close-button';
+        closeButton.innerHTML = youtubeOverlayIcon('close', 20);
+        closeButton.setAttribute('aria-label', 'Close overlay');
+        closeButton.title = 'Close overlay';
+        Object.assign(closeButton.style, {
+            position: 'fixed',
+            top: '18px',
+            right: '18px',
+            width: '44px',
+            height: '44px',
+            padding: '0',
+            backgroundColor: YOUTUBE_OVERLAY_UI.ivory,
+            color: YOUTUBE_OVERLAY_UI.charcoal,
+            border: 'none',
+            borderRadius: '12px',
+            cursor: 'pointer',
+            zIndex: '114515',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'transform 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease',
+            boxShadow: '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.ringWarm + ', 0 8px 24px rgba(20, 20, 19, 0.12)'
+        });
+        closeButton.addEventListener('mouseenter', () => {
+            closeButton.style.transform = 'translateY(-1px)';
+            closeButton.style.backgroundColor = YOUTUBE_OVERLAY_UI.nearBlack;
+            closeButton.style.color = YOUTUBE_OVERLAY_UI.ivory;
+            closeButton.style.boxShadow = '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.darkSurface + ', 0 12px 28px rgba(20, 20, 19, 0.18)';
+        });
+        closeButton.addEventListener('mouseleave', () => {
+            closeButton.style.transform = 'translateY(0)';
+            closeButton.style.backgroundColor = YOUTUBE_OVERLAY_UI.ivory;
+            closeButton.style.color = YOUTUBE_OVERLAY_UI.charcoal;
+            closeButton.style.boxShadow = '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.ringWarm + ', 0 8px 24px rgba(20, 20, 19, 0.12)';
+        });
+        closeButton.addEventListener('click', () => {
+            cleanupOverlay();
+        });
+
+        videoContainer = document.createElement('div');
+        videoContainer.id = 'overlay-video-container';
+        Object.assign(videoContainer.style, {
+            flex: '1',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            maxWidth: '1280px',
+            padding: '24px 24px 96px',
+            boxSizing: 'border-box'
+        });
+
+        const videoWrapper = document.createElement('div');
+        videoWrapper.id = 'overlay-video-wrapper';
+        Object.assign(videoWrapper.style, {
+            position: 'relative',
+            width: '100%',
+            maxWidth: '100%',
+            aspectRatio: '16/9',
+            backgroundColor: YOUTUBE_OVERLAY_UI.nearBlack,
+            borderRadius: '18px',
+            overflow: 'hidden',
+            border: '1px solid ' + YOUTUBE_OVERLAY_UI.darkSurface,
+            boxShadow: '0 18px 48px rgba(20, 20, 19, 0.18)'
+        });
+
+        videoWrapper.appendChild(originalVideo);
+        videoContainer.appendChild(videoWrapper);
+
+        const controlBar = createControlButtons();
+
+        document.body.appendChild(overlay);
+        document.body.appendChild(closeButton);
+        document.body.appendChild(controlBar);
+        overlay.appendChild(videoContainer);
+        document.body.style.overflow = 'hidden';
+        overlayContainer = overlay;
+        isOverlayActive = true;
+        chrome.storage.local.set({ youtubeVideoOverlay: true });
+        updateFloatButtonState();
+
+        Object.assign(originalVideo.style, {
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            position: 'relative'
+        });
+
+        console.log("YouTube 视频覆盖层创建成功，视频已移动到覆盖层");
+
+        getYoutubeSubtitles().then(() => {
+            updateDisplayMode();
+            startSubtitleUpdate();
+        });
+
+        keydownHandler = function(event) {
+            if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            switch(event.code) {
+                case 'KeyA':
+                    event.preventDefault();
+                    navigateSubtitles('prev');
+                    break;
+                case 'KeyS':
+                    event.preventDefault();
+                    navigateSubtitles('current');
+                    break;
+                case 'KeyD':
+                    event.preventDefault();
+                    navigateSubtitles('next');
+                    break;
+            }
+        };
+        document.addEventListener('keydown', keydownHandler);
+
+        playHandler = function() {
+            if (!isProgramTriggeredPlay) {
+                console.log("用户手动播放，重播模式关闭");
+                isReplayMode = false;
+            } else {
+                console.log("程序触发的播放，保持重播模式");
+            }
+        };
+        const video = getVideoElement();
+        if (video) {
+            video.addEventListener('play', playHandler);
+        }
+    }
+
+    chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+        if (request.action === "toggleYoutubeVideoOverlay") {
+            if (isOverlayActive) {
+                cleanupOverlay();
+            } else {
+                initializeOverlay();
+            }
+        } else if (request.action === "updateYoutubeSubtitleOffset") {
+            subtitleOffsetMode = request.offsetMode || 'normal';
+            lastOverlaySubtitleText = '';
+            console.log("字幕偏移模式已更新:", subtitleOffsetMode);
+        }
+    });
+
+    function getPunctuationRegex() {
+        if (window.youtubeCommaSentencingEnabled) {
+            return /[,.!?:;。、？！]/;
+        } else {
+            return /[.!?:;。？！]/;
+        }
+    }
+
+    function getVideoElement() {
+        if (videoElement) {
+            return videoElement;
+        }
+        const newVideoElement = document.querySelector('video');
+        if (newVideoElement) {
+            videoElement = newVideoElement;
+            return videoElement;
+        }
+        return null;
+    }
+
+    function getYoutubeCurrentTime() {
+        const video = getVideoElement();
+        if (video && typeof video.currentTime === 'number') {
+            return video.currentTime * 1000;
+        }
+        return 0;
+    }
+
+    function setYoutubeTime(timeMs) {
+        const video = getVideoElement();
+        if (video) {
+            video.currentTime = timeMs / 1000;
+        }
+    }
+
+    function playVideo() {
+        const video = getVideoElement();
+        if (video) {
+            try {
+                const playPromise = video.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.warn('播放视频时出错:', error);
+                    });
+                }
+            } catch (e) {
+                console.warn('调用play()方法时出错:', e);
+            }
+        }
+    }
+
+    function pauseVideo() {
+        const video = getVideoElement();
+        if (video) {
+            try {
+                video.pause();
+            } catch (e) {
+                console.warn('调用pause()方法时出错:', e);
+            }
+        }
+    }
+
+    function getYoutubeID() {
+        const videoURL = window.location.href;
+        var splited = videoURL.split("v=");
+        if (splited.length < 2) return null;
+        var splitedAgain = splited[1].split("&");
+        var videoId = splitedAgain[0];
+        return videoId;
+    }
+
+    async function getYoutubeSubtitlesAPI() {
+        try {
+            console.log('开始获取字幕URL...');
+            const url = await window.forceSubtitleAndGetJsonUrl();
+            if (url) {
+                console.log(`成功获取字幕URL: ${url}`);
+                return await getTrackData(url);
+            } else {
+                console.log('无法获取字幕URL');
+                return null;
+            }
+        } catch (error) {
+            console.error('获取字幕时出错:', error);
+            return null;
+        }
+
+        async function getTrackData(subtitleUrl) {
+            console.log(`正在获取json字幕: ${subtitleUrl}`);
+            try {
+                const subtitleResponse = await fetch(subtitleUrl);
+                const subtitleData = await subtitleResponse.json();
+                console.log('字幕数据获取成功');
+                return subtitleData;
+            } catch (fetchError) {
+                console.error('获取字幕内容时出错:', fetchError);
+                return null;
+            }
+        }
+    }
+
+    function rebuildSubtitles(subtitleData) {
+        const result = [];
+        const words = [];
+        const punctuationRegex = getPunctuationRegex();
+        const events = subtitleData.events || [];
+
+        events.forEach(paragraph => {
+            const paragraphStartTime = paragraph.tStartMs;
+            if (paragraph.segs) {
+                paragraph.segs.forEach(segment => {
+                    if (segment.utf8 === "\n") return;
+                    let wordStartTime = paragraphStartTime;
+                    if (segment.tOffsetMs !== undefined) {
+                        wordStartTime += segment.tOffsetMs;
+                    }
+                    let wordText = segment.utf8.trim();
+                    if (wordText === "") return;
+                    const hasPunctuation = punctuationRegex.test(wordText);
+                    let punctuation = null;
+                    if (hasPunctuation) {
+                        const lastChar = wordText.charAt(wordText.length - 1);
+                        if (punctuationRegex.test(lastChar)) {
+                            punctuation = lastChar;
+                            wordText = wordText.substring(0, wordText.length - 1).trim();
+                        }
+                    }
+                    if (wordText === "") return;
+                    let wordEndTime = paragraphStartTime + paragraph.dDurationMs;
+                    words.push({
+                        utf8: wordText,
+                        tStartMs: wordStartTime,
+                        tEndMs: wordEndTime,
+                        punctuation: punctuation
+                    });
+                });
+            }
+        });
+
+        for (let i = 0; i < words.length - 1; i++) {
+            words[i].tEndMs = words[i + 1].tStartMs;
+        }
+
+        for (let i = 0; i < words.length; i++) {
+            result.push(words[i]);
+            const punctuationArray = words[i].punctuation ? [words[i].punctuation] : [];
+            result.push(punctuationArray);
+        }
+
+        console.log("重建字幕结构，处理了原生标点符号");
+        return result;
+    }
+
+    function getWordsAroundTimestamp(timestamp, subtitles, wordCount = 50) {
+        let closestIndex = -1;
+        let minTimeDiff = Infinity;
+
+        for (let i = 0; i < subtitles.length; i++) {
+            const element = subtitles[i];
+            if (!element || Array.isArray(element) || !element.utf8) continue;
+            if (timestamp >= element.tStartMs && timestamp <= element.tEndMs) {
+                closestIndex = i;
+                break;
+            }
+            const timeDiff = Math.min(
+                Math.abs(timestamp - element.tStartMs),
+                Math.abs(timestamp - element.tEndMs)
+            );
+            if (timeDiff < minTimeDiff) {
+                minTimeDiff = timeDiff;
+                closestIndex = i;
+            }
+        }
+
+        if (closestIndex === -1) {
+            return [];
+        }
+
+        let startIndex = Math.max(0, closestIndex - 200);
+        let endIndex = Math.min(subtitles.length - 1, closestIndex + 200);
+        const totalElements = endIndex - startIndex + 1;
+        if (totalElements > 400) {
+            const excess = totalElements - 400;
+            startIndex += Math.floor(excess / 2);
+            endIndex -= Math.ceil(excess / 2);
+        }
+
+        const result = [];
+        for (let i = startIndex; i <= endIndex; i++) {
+            const element = subtitles[i];
+            if (Array.isArray(element) && element.length === 0) {
+                continue;
+            }
+            result.push({
+                originalIndex: i,
+                data: element
+            });
+        }
+
+        return result;
+    }
+
+    function mergeWordsIntoSentences(words) {
+        let result = '';
+        for (let i = 0; i < words.length; i++) {
+            const item = words[i];
+            if (!item || !item.data) continue;
+            if (item.data && typeof item.data === 'object' && item.data.utf8) {
+                if (result.length > 0) {
+                    result += ' ';
+                }
+                result += item.data.utf8;
+            } else if (Array.isArray(item.data) && item.data.length > 0) {
+                result += item.data[0];
+            }
+        }
+        return result.trim();
+    }
+
+    function getCurrentSentence(currentTime, subtitles) {
+        const wordsAround = getWordsAroundTimestamp(currentTime, subtitles);
+        if (!wordsAround || wordsAround.length === 0) {
+            return null;
+        }
+
+        const punctuationRegex = getPunctuationRegex();
+        let currentWordIndex = -1;
+        for (let i = 0; i < wordsAround.length; i++) {
+            const wordItem = wordsAround[i];
+            if (wordItem && wordItem.data && !Array.isArray(wordItem.data) &&
+                currentTime >= wordItem.data.tStartMs && currentTime <= wordItem.data.tEndMs) {
+                currentWordIndex = i;
+                break;
+            }
+        }
+
+        if (currentWordIndex === -1) {
+            let minTimeDiff = Infinity;
+            for (let i = 0; i < wordsAround.length; i++) {
+                const wordItem = wordsAround[i];
+                if (wordItem && wordItem.data && !Array.isArray(wordItem.data)) {
+                    const midTime = (wordItem.data.tStartMs + wordItem.data.tEndMs) / 2;
+                    const timeDiff = Math.abs(currentTime - midTime);
+                    if (timeDiff < minTimeDiff) {
+                        minTimeDiff = timeDiff;
+                        currentWordIndex = i;
+                    }
+                }
+            }
+            if (currentWordIndex === -1) {
+                currentWordIndex = 0;
+            }
+        }
+
+        let segmentStartIndex = 0;
+        for (let i = currentWordIndex - 1; i >= 0; i--) {
+            if (wordsAround[i] && Array.isArray(wordsAround[i].data) &&
+                wordsAround[i].data[0] && punctuationRegex.test(wordsAround[i].data[0])) {
+                segmentStartIndex = i + 1;
+                break;
+            }
+        }
+
+        let segmentEndIndex = wordsAround.length - 1;
+        for (let i = currentWordIndex; i < wordsAround.length; i++) {
+            if (wordsAround[i] && Array.isArray(wordsAround[i].data) &&
+                wordsAround[i].data[0] && punctuationRegex.test(wordsAround[i].data[0])) {
+                segmentEndIndex = i;
+                break;
+            }
+        }
+
+        const segmentWords = wordsAround.slice(segmentStartIndex, segmentEndIndex + 1);
+        const sentenceText = mergeWordsIntoSentences(segmentWords);
+
+        let startTime = 0;
+        let endTime = 0;
+        for (let i = 0; i < segmentWords.length; i++) {
+            const wordItem = segmentWords[i];
+            if (wordItem && wordItem.data && !Array.isArray(wordItem.data)) {
+                if (startTime === 0 || wordItem.data.tStartMs < startTime) {
+                    startTime = wordItem.data.tStartMs;
+                }
+                if (wordItem.data.tEndMs > endTime) {
+                    endTime = wordItem.data.tEndMs;
+                }
+            }
+        }
+
+        return {
+            text: sentenceText,
+            words: segmentWords,
+            startTime: startTime,
+            endTime: endTime
+        };
+    }
+
+    async function getYoutubeSubtitles() {
+        const videoId = getYoutubeID();
+        if (!videoId) {
+            console.error("无法获取视频ID");
+            return [];
+        }
+
+        try {
+            const subtitleData = await getYoutubeSubtitlesAPI(videoId);
+            if (subtitleData) {
+                console.log("字幕数据已加载");
+                subtitles = subtitleData;
+                rebuiltSubtitles = rebuildSubtitles(subtitleData);
+                console.log("字幕已重建，共有单词：", rebuiltSubtitles.length);
+                return rebuiltSubtitles;
+            } else {
+                console.error("获取字幕失败");
+                return [];
+            }
+        } catch (error) {
+            console.error("获取字幕时发生错误:", error);
+            return [];
+        }
+    }
+
+    function getCurrentSubtitles() {
+        if (isReplayMode) {
+            return currentSubtitleInheiten;
+        }
+
+        const currentTime = getYoutubeCurrentTime();
+        let currentSentence = getCurrentSentence(currentTime, rebuiltSubtitles);
+
+        if (!currentSentence) {
+            return null;
+        }
+
+        if (subtitleOffsetMode === 'prev') {
+            const prevSentence = getPrevSentence(currentTime, rebuiltSubtitles);
+            if (prevSentence) {
+                currentSentence = prevSentence;
+            }
+        } else if (subtitleOffsetMode === 'next') {
+            const nextSentence = getNextSentence(currentTime, rebuiltSubtitles);
+            if (nextSentence) {
+                currentSentence = nextSentence;
+            }
+        }
+
+        currentSubtitleInheiten = currentSentence;
+        return currentSentence;
+    }
+
+    function getPrevSentence(currentTime, subtitles) {
+        const wordsAround = getWordsAroundTimestamp(currentTime, subtitles);
+        if (!wordsAround || wordsAround.length === 0) {
+            return null;
+        }
+
+        const punctuationRegex = getPunctuationRegex();
+        let currentWordIndex = -1;
+        for (let i = 0; i < wordsAround.length; i++) {
+            const wordItem = wordsAround[i];
+            if (wordItem && wordItem.data && !Array.isArray(wordItem.data) &&
+                currentTime >= wordItem.data.tStartMs && currentTime <= wordItem.data.tEndMs) {
+                currentWordIndex = i;
+                break;
+            }
+        }
+
+        if (currentWordIndex === -1) {
+            return null;
+        }
+
+        let segmentStartIndex = 0;
+        for (let i = currentWordIndex - 1; i >= 0; i--) {
+            if (wordsAround[i] && Array.isArray(wordsAround[i].data) &&
+                wordsAround[i].data[0] && punctuationRegex.test(wordsAround[i].data[0])) {
+                segmentStartIndex = i + 1;
+                break;
+            }
+        }
+
+        if (segmentStartIndex === 0) {
+            return null;
+        }
+
+        let prevSegmentEndIndex = -1;
+        for (let i = segmentStartIndex - 1; i >= 0; i--) {
+            if (wordsAround[i] && Array.isArray(wordsAround[i].data) &&
+                wordsAround[i].data[0] && punctuationRegex.test(wordsAround[i].data[0])) {
+                prevSegmentEndIndex = i;
+                break;
+            }
+        }
+
+        if (prevSegmentEndIndex === -1) {
+            prevSegmentEndIndex = segmentStartIndex - 1;
+        }
+
+        let prevSegmentStartIndex = 0;
+        for (let i = prevSegmentEndIndex - 1; i >= 0; i--) {
+            if (wordsAround[i] && Array.isArray(wordsAround[i].data) &&
+                wordsAround[i].data[0] && punctuationRegex.test(wordsAround[i].data[0])) {
+                prevSegmentStartIndex = i + 1;
+                break;
+            }
+        }
+
+        const segmentWords = wordsAround.slice(prevSegmentStartIndex, prevSegmentEndIndex + 1);
+        const sentenceText = mergeWordsIntoSentences(segmentWords);
+
+        let startTime = 0;
+        let endTime = 0;
+        for (let i = 0; i < segmentWords.length; i++) {
+            const wordItem = segmentWords[i];
+            if (wordItem && wordItem.data && !Array.isArray(wordItem.data)) {
+                if (startTime === 0 || wordItem.data.tStartMs < startTime) {
+                    startTime = wordItem.data.tStartMs;
+                }
+                if (wordItem.data.tEndMs > endTime) {
+                    endTime = wordItem.data.tEndMs;
+                }
+            }
+        }
+
+        return {
+            text: sentenceText,
+            words: segmentWords,
+            startTime: startTime,
+            endTime: endTime
+        };
+    }
+
+    function getNextSentence(currentTime, subtitles) {
+        const wordsAround = getWordsAroundTimestamp(currentTime, subtitles);
+        if (!wordsAround || wordsAround.length === 0) {
+            return null;
+        }
+
+        const punctuationRegex = getPunctuationRegex();
+        let currentWordIndex = -1;
+        for (let i = 0; i < wordsAround.length; i++) {
+            const wordItem = wordsAround[i];
+            if (wordItem && wordItem.data && !Array.isArray(wordItem.data) &&
+                currentTime >= wordItem.data.tStartMs && currentTime <= wordItem.data.tEndMs) {
+                currentWordIndex = i;
+                break;
+            }
+        }
+
+        if (currentWordIndex === -1) {
+            return null;
+        }
+
+        let segmentEndIndex = wordsAround.length - 1;
+        for (let i = currentWordIndex; i < wordsAround.length; i++) {
+            if (wordsAround[i] && Array.isArray(wordsAround[i].data) &&
+                wordsAround[i].data[0] && punctuationRegex.test(wordsAround[i].data[0])) {
+                segmentEndIndex = i;
+                break;
+            }
+        }
+
+        if (segmentEndIndex >= wordsAround.length - 1) {
+            return null;
+        }
+
+        let nextSegmentStartIndex = segmentEndIndex + 1;
+        let nextSegmentEndIndex = wordsAround.length - 1;
+        for (let i = nextSegmentStartIndex; i < wordsAround.length; i++) {
+            if (wordsAround[i] && Array.isArray(wordsAround[i].data) &&
+                wordsAround[i].data[0] && punctuationRegex.test(wordsAround[i].data[0])) {
+                nextSegmentEndIndex = i;
+                break;
+            }
+        }
+
+        const segmentWords = wordsAround.slice(nextSegmentStartIndex, nextSegmentEndIndex + 1);
+        const sentenceText = mergeWordsIntoSentences(segmentWords);
+
+        let startTime = 0;
+        let endTime = 0;
+        for (let i = 0; i < segmentWords.length; i++) {
+            const wordItem = segmentWords[i];
+            if (wordItem && wordItem.data && !Array.isArray(wordItem.data)) {
+                if (startTime === 0 || wordItem.data.tStartMs < startTime) {
+                    startTime = wordItem.data.tStartMs;
+                }
+                if (wordItem.data.tEndMs > endTime) {
+                    endTime = wordItem.data.tEndMs;
+                }
+            }
+        }
+
+        return {
+            text: sentenceText,
+            words: segmentWords,
+            startTime: startTime,
+            endTime: endTime
+        };
+    }
+
+    function navigateSubtitles(direction) {
+        if (!rebuiltSubtitles || rebuiltSubtitles.length === 0) return;
+
+        const currentTime = getYoutubeCurrentTime();
+        const currentSentence = getCurrentSentence(currentTime, rebuiltSubtitles);
+        if (!currentSentence || !currentSentence.words || currentSentence.words.length === 0) {
+            console.log("无法获取当前句子");
+            return;
+        }
+
+        const punctuationRegex = getPunctuationRegex();
+
+        function findTargetSentence() {
+            if (direction === 'current') {
+                return currentSentence;
+            }
+
+            const firstWordItem = currentSentence.words[0];
+            const lastWordItem = currentSentence.words[currentSentence.words.length - 1];
+
+            if (!firstWordItem || !lastWordItem) return null;
+
+            const currentStartIndex = firstWordItem.originalIndex;
+            const currentEndIndex = lastWordItem.originalIndex;
+
+            if (direction === 'prev') {
+                let prevSentenceEndIndex = -1;
+
+                for (let i = currentStartIndex - 1; i >= 0; i--) {
+                    if (Array.isArray(rebuiltSubtitles[i]) &&
+                        rebuiltSubtitles[i][0] &&
+                        punctuationRegex.test(rebuiltSubtitles[i][0])) {
+                        prevSentenceEndIndex = i;
+                        break;
+                    }
+                }
+
+                if (prevSentenceEndIndex > 0) {
+                    let prevSentenceStartIndex = 0;
+                    for (let i = prevSentenceEndIndex - 1; i >= 0; i--) {
+                        if (Array.isArray(rebuiltSubtitles[i]) &&
+                            rebuiltSubtitles[i][0] &&
+                            punctuationRegex.test(rebuiltSubtitles[i][0])) {
+                            prevSentenceStartIndex = i + 1;
+                            break;
+                        }
+                    }
+
+                    const prevSentenceWords = [];
+                    for (let i = prevSentenceStartIndex; i <= prevSentenceEndIndex; i++) {
+                        prevSentenceWords.push({
+                            originalIndex: i,
+                            data: rebuiltSubtitles[i]
+                        });
+                    }
+
+                    const prevSentenceText = mergeWordsIntoSentences(prevSentenceWords);
+                    let prevStartTime = 0;
+                    let prevEndTime = 0;
+                    for (let i = 0; i < prevSentenceWords.length; i++) {
+                        const wordItem = prevSentenceWords[i];
+                        if (wordItem && wordItem.data && !Array.isArray(wordItem.data)) {
+                            if (prevStartTime === 0 || wordItem.data.tStartMs < prevStartTime) {
+                                prevStartTime = wordItem.data.tStartMs;
+                            }
+                            if (wordItem.data.tEndMs > prevEndTime) {
+                                prevEndTime = wordItem.data.tEndMs;
+                            }
+                        }
+                    }
+
+                    return {
+                        text: prevSentenceText,
+                        words: prevSentenceWords,
+                        startTime: prevStartTime,
+                        endTime: prevEndTime,
+                        currentIndex: prevSentenceStartIndex
+                    };
+                }
+            } else if (direction === 'next') {
+                let nextSentenceStartIndex = -1;
+
+                for (let i = currentEndIndex + 1; i < rebuiltSubtitles.length; i++) {
+                    if (Array.isArray(rebuiltSubtitles[i-1]) &&
+                        rebuiltSubtitles[i-1][0] &&
+                        punctuationRegex.test(rebuiltSubtitles[i-1][0]) &&
+                        !Array.isArray(rebuiltSubtitles[i])) {
+                        nextSentenceStartIndex = i;
+                        break;
+                    }
+                }
+
+                if (nextSentenceStartIndex > 0) {
+                    let nextSentenceEndIndex = rebuiltSubtitles.length - 1;
+                    for (let i = nextSentenceStartIndex; i < rebuiltSubtitles.length; i++) {
+                        if (Array.isArray(rebuiltSubtitles[i]) &&
+                            rebuiltSubtitles[i][0] &&
+                            punctuationRegex.test(rebuiltSubtitles[i][0])) {
+                            nextSentenceEndIndex = i;
+                            break;
+                        }
+                    }
+
+                    const nextSentenceWords = [];
+                    for (let i = nextSentenceStartIndex; i <= nextSentenceEndIndex; i++) {
+                        nextSentenceWords.push({
+                            originalIndex: i,
+                            data: rebuiltSubtitles[i]
+                        });
+                    }
+
+                    const nextSentenceText = mergeWordsIntoSentences(nextSentenceWords);
+                    let nextStartTime = 0;
+                    let nextEndTime = 0;
+                    for (let i = 0; i < nextSentenceWords.length; i++) {
+                        const wordItem = nextSentenceWords[i];
+                        if (wordItem && wordItem.data && !Array.isArray(wordItem.data)) {
+                            if (nextStartTime === 0 || wordItem.data.tStartMs < nextStartTime) {
+                                nextStartTime = wordItem.data.tStartMs;
+                            }
+                            if (wordItem.data.tEndMs > nextEndTime) {
+                                nextEndTime = wordItem.data.tEndMs;
+                            }
+                        }
+                    }
+
+                    return {
+                        text: nextSentenceText,
+                        words: nextSentenceWords,
+                        startTime: nextStartTime,
+                        endTime: nextEndTime,
+                        currentIndex: nextSentenceStartIndex
+                    };
+                }
+            } else if (direction === 'replay') {
+                return {
+                    text: currentSentence.text,
+                    words: currentSentence.words,
+                    startTime: currentSentence.startTime,
+                    endTime: currentSentence.endTime,
+                    currentIndex: currentStartIndex
+                };
+            }
+
+            return null;
+        }
+
+        const targetSentence = findTargetSentence();
+        if (!targetSentence || !targetSentence.words || targetSentence.words.length === 0) {
+            console.log("无法获取目标句子");
+            return;
+        }
+
+        currentSubtitleInheiten = targetSentence;
+
+        let firstValidWord = null;
+        let lastValidWord = null;
+
+        for (let i = 0; i < targetSentence.words.length; i++) {
+            const wordItem = targetSentence.words[i];
+            if (wordItem && wordItem.data && !Array.isArray(wordItem.data) &&
+                wordItem.data.tStartMs !== undefined && wordItem.data.tEndMs !== undefined) {
+                if (!firstValidWord) firstValidWord = wordItem.data;
+                lastValidWord = wordItem.data;
+            }
+        }
+
+        if (!firstValidWord || !lastValidWord) {
+            console.log("无法确定目标句子的时间范围");
+            return;
+        }
+
+        console.log("重播模式开启");
+        isReplayMode = true;
+        currentSubtitleIndex = targetSentence.currentIndex;
+
+        const video = getVideoElement();
+
+        if (video) {
+            isProgramTriggeredPlay = true;
+
+            console.log(`导航到${direction}句，当前视频状态: ${video.paused ? '暂停' : '播放中'}`);
+
+            video.pause();
+
+            video.currentTime = firstValidWord.tStartMs / 1000;
+
+            setTimeout(() => {
+                console.log(`开始播放${direction}句`);
+                playVideo();
+            }, 50);
+
+            if (autoPauseEnabled) {
+                const checkInterval = setInterval(() => {
+                    const currentVideo = getVideoElement();
+
+                    if (currentVideo) {
+                        const now = currentVideo.currentTime * 1000;
+
+                        if (lastValidWord && now >= lastValidWord.tEndMs - 100) {
+                            clearInterval(checkInterval);
+                            pauseVideo();
+                            console.log("重播句子结束");
+                        }
+                    } else {
+                        clearInterval(checkInterval);
+                        console.warn("在 interval 中无法获取视频元素");
+                    }
+                }, 50);
+            } else {
+                const checkInterval = setInterval(() => {
+                    const currentVideo = getVideoElement();
+
+                    if (currentVideo) {
+                        const now = currentVideo.currentTime * 1000;
+
+                        if (lastValidWord && now >= lastValidWord.tEndMs - 100) {
+                            clearInterval(checkInterval);
+                            isReplayMode = false;
+                            console.log("句子播放结束，退出重播模式");
+                        }
+                    } else {
+                        clearInterval(checkInterval);
+                        console.warn("在 interval 中无法获取视频元素");
+                    }
+                }, 50);
+            }
+
+            setTimeout(() => {
+                isProgramTriggeredPlay = false;
+            }, 100);
+        } else {
+            console.warn("无法获取视频元素");
+        }
+
+        if (direction === 'current') {
+            skipSubtitleRefresh = true;
+            setTimeout(() => {
+                skipSubtitleRefresh = false;
+            }, 1000);
+        }
+    }
+
+    function checkMobileMode() {
+        isMobileMode = window.innerWidth <= 768;
+        return isMobileMode;
+    }
+
+    function createControlButtons() {
+        const controlBar = document.createElement('div');
+        controlBar.id = 'overlay-control-bar';
+        styleControlBar(controlBar);
+
+        const autoPauseBtn = createControlButton('autoPause', 'Auto Pause', () => {
+            autoPauseEnabled = !autoPauseEnabled;
+            setWarmButtonState(autoPauseBtn, autoPauseEnabled);
+            console.log('自动暂停:', autoPauseEnabled);
+        });
+        setWarmButtonState(autoPauseBtn, autoPauseEnabled);
+
+        const playPauseBtn = createControlButton('play', 'Play/Pause', () => {
+            const video = getVideoElement();
+            if (video) {
+                if (video.paused) {
+                    playVideo();
+                } else {
+                    pauseVideo();
+                }
+            }
+        });
+
+        const prevBtn = createControlButton('skipBack', 'Previous', () => {
+            navigateSubtitles('prev');
+        });
+
+        const replayBtn = createControlButton('replay', 'Replay', () => {
+            navigateSubtitles('replay');
+        });
+
+        const nextBtn = createControlButton('skipForward', 'Next', () => {
+            navigateSubtitles('next');
+        });
+
+        const modeBtn = createControlButton('layout', 'Display Mode', () => {
+            showModeSelector();
+        });
+
+        const settingsBtn = createControlButton('settings', '设置', () => {
+            showOverlaySettings();
+        });
+
+        controlBar.appendChild(autoPauseBtn);
+        controlBar.appendChild(playPauseBtn);
+        controlBar.appendChild(prevBtn);
+        controlBar.appendChild(replayBtn);
+        controlBar.appendChild(nextBtn);
+        controlBar.appendChild(modeBtn);
+        controlBar.appendChild(settingsBtn);
+
+        return controlBar;
+    }
+
+    function createControlButton(icon, title, onClick) {
+        const button = document.createElement('button');
+        button.innerHTML = youtubeOverlayIcon(icon, 18);
+        button.title = title;
+        button.setAttribute('aria-label', title);
+        Object.assign(button.style, {
+            width: '44px',
+            height: '44px',
+            borderRadius: '12px',
+            backgroundColor: YOUTUBE_OVERLAY_UI.warmSand,
+            color: YOUTUBE_OVERLAY_UI.charcoal,
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0',
+            transition: 'transform 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease',
+            boxShadow: '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.ringWarm,
+            flex: '0 0 44px'
+        });
+
+        button.addEventListener('mouseenter', () => {
+            if (button.dataset.active === 'true') return;
+            button.style.transform = 'translateY(-1px)';
+            button.style.backgroundColor = YOUTUBE_OVERLAY_UI.ivory;
+            button.style.boxShadow = '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.ringDeep + ', 0 8px 20px rgba(20, 20, 19, 0.1)';
+        });
+
+        button.addEventListener('mouseleave', () => {
+            button.style.transform = 'translateY(0)';
+            setWarmButtonState(button, button.dataset.active === 'true');
+        });
+
+        button.addEventListener('click', onClick);
+        setWarmButtonState(button, false);
+
+        return button;
+    }
+    function showModeSelector() {
+        const existingSelector = document.getElementById('mode-selector');
+        if (existingSelector) {
+            existingSelector.remove();
+            return;
+        }
+
+        const selector = document.createElement('div');
+        selector.id = 'mode-selector';
+        Object.assign(selector.style, {
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: YOUTUBE_OVERLAY_UI.ivory,
+            borderRadius: '14px',
+            boxShadow: '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.borderWarm + ', 0 18px 48px rgba(20, 20, 19, 0.16)',
+            zIndex: '114515',
+            padding: '20px',
+            minWidth: '300px'
+        });
+
+        const title = document.createElement('h3');
+        title.textContent = '选择显示模式';
+        Object.assign(title.style, {
+            margin: '0 0 15px 0',
+            textAlign: 'center',
+            color: YOUTUBE_OVERLAY_UI.charcoal
+        });
+
+        const modes = [
+            { id: 'theater', name: '剧场模式', desc: '视频在上，字幕在下' },
+            { id: 'cinema', name: '影院模式', desc: '视频全屏，字幕居中覆盖' },
+            { id: 'reading', name: '阅读模式', desc: '左侧视频，右侧字幕列表' },
+            { id: 'hybrid', name: '混合模式', desc: '视频靠左，下方字幕，右侧字幕列表' },
+            { id: 'mobile-theater', name: '手机剧场模式', desc: '顶部40%视频，底部字幕' },
+            { id: 'mobile-reading', name: '手机阅读模式', desc: '顶部40%视频，底部字幕列表' }
+        ];
+
+        const modeList = document.createElement('div');
+        Object.assign(modeList.style, {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px'
+        });
+
+        modes.forEach(mode => {
+            const modeBtn = document.createElement('button');
+            modeBtn.innerHTML = `<strong>${mode.name}</strong><br><small>${mode.desc}</small>`;
+            Object.assign(modeBtn.style, {
+                padding: '10px',
+                border: '1px solid ' + YOUTUBE_OVERLAY_UI.borderWarm,
+                borderRadius: '14px',
+                backgroundColor: currentDisplayMode === mode.id ? YOUTUBE_OVERLAY_UI.terracotta : YOUTUBE_OVERLAY_UI.ivory,
+                color: currentDisplayMode === mode.id ? YOUTUBE_OVERLAY_UI.ivory : YOUTUBE_OVERLAY_UI.charcoal,
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.2s ease'
+            });
+
+            modeBtn.addEventListener('mouseenter', () => {
+                if (currentDisplayMode !== mode.id) {
+                    modeBtn.style.backgroundColor = YOUTUBE_OVERLAY_UI.warmSand;
+                }
+            });
+
+            modeBtn.addEventListener('mouseleave', () => {
+                if (currentDisplayMode !== mode.id) {
+                    modeBtn.style.backgroundColor = YOUTUBE_OVERLAY_UI.ivory;
+                }
+            });
+
+            modeBtn.addEventListener('click', () => {
+                currentDisplayMode = mode.id;
+                chrome.storage.local.set({ youtubeDisplayMode: mode.id });
+                updateDisplayMode();
+                selector.remove();
+            });
+
+            modeList.appendChild(modeBtn);
+        });
+
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '关闭';
+        Object.assign(closeBtn.style, {
+            marginTop: '15px',
+            padding: '8px 16px',
+            backgroundColor: YOUTUBE_OVERLAY_UI.nearBlack,
+            color: YOUTUBE_OVERLAY_UI.ivory,
+            border: 'none',
+            borderRadius: '14px',
+            cursor: 'pointer',
+            width: '100%'
+        });
+
+        closeBtn.addEventListener('click', () => {
+            selector.remove();
+        });
+
+        selector.appendChild(title);
+        selector.appendChild(modeList);
+        selector.appendChild(closeBtn);
+        document.body.appendChild(selector);
+    }
+
+    function showOverlaySettings() {
+        const existingSelector = document.getElementById('overlay-settings-selector');
+        if (existingSelector) {
+            existingSelector.remove();
+            return;
+        }
+
+        const selector = document.createElement('div');
+        selector.id = 'overlay-settings-selector';
+        Object.assign(selector.style, {
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: YOUTUBE_OVERLAY_UI.ivory,
+            borderRadius: '18px',
+            boxShadow: '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.borderWarm + ', 0 18px 48px rgba(20, 20, 19, 0.16)',
+            zIndex: '114515',
+            padding: '20px',
+            width: 'min(380px, calc(100vw - 32px))',
+            maxHeight: 'calc(100vh - 48px)',
+            overflowY: 'auto',
+            boxSizing: 'border-box'
+        });
+
+        const title = document.createElement('h3');
+        title.textContent = '覆盖层设置';
+        Object.assign(title.style, {
+            margin: '0 0 16px 0',
+            color: YOUTUBE_OVERLAY_UI.charcoal,
+            fontSize: '18px',
+            lineHeight: '1.4'
+        });
+
+        const subtitleSection = document.createElement('section');
+        Object.assign(subtitleSection.style, {
+            padding: '16px',
+            borderRadius: '14px',
+            backgroundColor: YOUTUBE_OVERLAY_UI.parchment,
+            boxShadow: '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.borderCream
+        });
+
+        const sectionTitle = document.createElement('h4');
+        sectionTitle.textContent = '字幕设置';
+        Object.assign(sectionTitle.style, {
+            margin: '0 0 4px 0',
+            color: YOUTUBE_OVERLAY_UI.charcoal,
+            fontSize: '15px'
+        });
+
+        const sectionDescription = document.createElement('p');
+        sectionDescription.textContent = '控制字幕显示时机与阅读模式的列表跟随。';
+        Object.assign(sectionDescription.style, {
+            margin: '0 0 16px 0',
+            color: YOUTUBE_OVERLAY_UI.stone,
+            fontSize: '12px',
+            lineHeight: '1.5'
+        });
+
+        const offsetLabel = document.createElement('div');
+        offsetLabel.textContent = '字幕偏移';
+        Object.assign(offsetLabel.style, {
+            marginBottom: '8px',
+            color: YOUTUBE_OVERLAY_UI.charcoal,
+            fontSize: '13px',
+            fontWeight: '600'
+        });
+
+        const modes = [
+            { id: 'normal', name: '正常', desc: '显示当前时间对应的字幕' },
+            { id: 'prev', name: '延后一条', desc: '显示当前字幕的前一条' },
+            { id: 'next', name: '提前一条', desc: '显示当前字幕的后一条' }
+        ];
+
+        const modeList = document.createElement('div');
+        Object.assign(modeList.style, {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+        });
+
+        const modeButtons = [];
+
+        function styleOffsetModeButton(button, modeId) {
+            const isActive = subtitleOffsetMode === modeId;
+            button.style.backgroundColor = isActive ? YOUTUBE_OVERLAY_UI.terracotta : YOUTUBE_OVERLAY_UI.ivory;
+            button.style.color = isActive ? YOUTUBE_OVERLAY_UI.ivory : YOUTUBE_OVERLAY_UI.charcoal;
+            button.style.borderColor = isActive ? YOUTUBE_OVERLAY_UI.terracotta : YOUTUBE_OVERLAY_UI.borderWarm;
+        }
+
+        modes.forEach(mode => {
+            const modeBtn = document.createElement('button');
+            modeBtn.innerHTML = `<strong>${mode.name}</strong><br><small>${mode.desc}</small>`;
+            Object.assign(modeBtn.style, {
+                padding: '10px',
+                border: '1px solid',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.2s ease'
+            });
+            styleOffsetModeButton(modeBtn, mode.id);
+
+            modeBtn.addEventListener('mouseenter', () => {
+                if (subtitleOffsetMode !== mode.id) {
+                    modeBtn.style.backgroundColor = YOUTUBE_OVERLAY_UI.warmSand;
+                }
+            });
+
+            modeBtn.addEventListener('mouseleave', () => {
+                styleOffsetModeButton(modeBtn, mode.id);
+            });
+
+            modeBtn.addEventListener('click', () => {
+                subtitleOffsetMode = mode.id;
+                chrome.storage.local.set({ youtubeSubtitleOffset: mode.id });
+                lastOverlaySubtitleText = '';
+                modeButtons.forEach(({ button, id }) => styleOffsetModeButton(button, id));
+            });
+
+            modeList.appendChild(modeBtn);
+            modeButtons.push({ button: modeBtn, id: mode.id });
+        });
+
+        const autoFollowRow = document.createElement('label');
+        Object.assign(autoFollowRow.style, {
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '16px',
+            marginTop: '14px',
+            padding: '12px',
+            borderRadius: '12px',
+            backgroundColor: YOUTUBE_OVERLAY_UI.ivory,
+            boxShadow: '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.borderWarm,
+            cursor: 'pointer'
+        });
+
+        const autoFollowCopy = document.createElement('span');
+        autoFollowCopy.innerHTML = '<strong style="display:block;font-size:13px;color:' + YOUTUBE_OVERLAY_UI.charcoal + ';">播放时自动跟随</strong>' +
+            '<small style="display:block;margin-top:3px;color:' + YOUTUBE_OVERLAY_UI.stone + ';line-height:1.45;">关闭后播放时也可自由滚动；暂停时始终不会跟随。</small>';
+
+        const autoFollowToggle = document.createElement('input');
+        autoFollowToggle.type = 'checkbox';
+        autoFollowToggle.checked = readingSubtitleAutoFollow;
+        autoFollowToggle.setAttribute('aria-label', '播放时字幕自动跟随');
+        Object.assign(autoFollowToggle.style, {
+            width: '20px',
+            height: '20px',
+            flex: '0 0 20px',
+            accentColor: YOUTUBE_OVERLAY_UI.terracotta,
+            cursor: 'pointer'
+        });
+
+        autoFollowToggle.addEventListener('change', () => {
+            readingSubtitleAutoFollow = autoFollowToggle.checked;
+            chrome.storage.local.set({ youtubeReadingSubtitleAutoFollow: readingSubtitleAutoFollow });
+            console.log('阅读模式字幕自动跟随:', readingSubtitleAutoFollow);
+        });
+
+        autoFollowRow.appendChild(autoFollowCopy);
+        autoFollowRow.appendChild(autoFollowToggle);
+
+        subtitleSection.appendChild(sectionTitle);
+        subtitleSection.appendChild(sectionDescription);
+        subtitleSection.appendChild(offsetLabel);
+        subtitleSection.appendChild(modeList);
+        subtitleSection.appendChild(autoFollowRow);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '关闭';
+        Object.assign(closeBtn.style, {
+            marginTop: '15px',
+            padding: '8px 16px',
+            backgroundColor: YOUTUBE_OVERLAY_UI.nearBlack,
+            color: YOUTUBE_OVERLAY_UI.ivory,
+            border: 'none',
+            borderRadius: '14px',
+            cursor: 'pointer',
+            width: '100%'
+        });
+
+        closeBtn.addEventListener('click', () => {
+            selector.remove();
+        });
+
+        selector.appendChild(title);
+        selector.appendChild(subtitleSection);
+        selector.appendChild(closeBtn);
+        document.body.appendChild(selector);
+    }
+
+    function updateDisplayMode() {
+        const overlay = document.getElementById('youtube-video-overlay');
+        if (!overlay) return;
+
+        const videoContainer = document.getElementById('overlay-video-container');
+        const controlBar = document.getElementById('overlay-control-bar');
+        const subtitleContainer = document.getElementById('overlay-subtitle-container');
+        const subtitleListContainer = document.getElementById('overlay-subtitle-list-container');
+        const leftContainer = document.getElementById('overlay-left-container');
+        const rightContainer = document.getElementById('overlay-right-container');
+
+        if (subtitleContainer) subtitleContainer.remove();
+        if (subtitleListContainer) subtitleListContainer.remove();
+        if (rightContainer) rightContainer.remove();
+
+        if (leftContainer) {
+            if (videoContainer && videoContainer.parentElement === leftContainer) {
+                overlay.appendChild(videoContainer);
+            }
+            leftContainer.remove();
+        }
+
+        lastOverlaySubtitleText = '';
+        subtitleListInitialized = false;
+
+        checkMobileMode();
+
+        switch (currentDisplayMode) {
+            case 'theater':
+                applyTheaterMode(overlay, videoContainer, controlBar);
+                break;
+            case 'cinema':
+                applyCinemaMode(overlay, videoContainer, controlBar);
+                break;
+            case 'reading':
+                applyReadingMode(overlay, videoContainer, controlBar);
+                break;
+            case 'hybrid':
+                applyHybridMode(overlay, videoContainer, controlBar);
+                break;
+            case 'mobile-theater':
+                applyMobileTheaterMode(overlay, videoContainer, controlBar);
+                break;
+            case 'mobile-reading':
+                applyMobileReadingMode(overlay, videoContainer, controlBar);
+                break;
+        }
+    }
+
+    function applyTheaterMode(overlay, videoContainer, controlBar) {
+        Object.assign(overlay.style, {
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'flex-start'
+        });
+
+        Object.assign(videoContainer.style, {
+            flex: '0 0 auto',
+            maxWidth: '1280px',
+            padding: '20px'
+        });
+
+        if (controlBar) {
+            styleControlBar(controlBar);
+        }
+
+        const subtitleContainer = createSubtitleContainer();
+        Object.assign(subtitleContainer.style, {
+            flex: '1',
+            width: '100%',
+            maxWidth: '1280px',
+            padding: '24px 24px 96px',
+            boxSizing: 'border-box',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '80px'
+        });
+
+        overlay.appendChild(subtitleContainer);
+    }
+
+    function applyCinemaMode(overlay, videoContainer, controlBar) {
+        Object.assign(overlay.style, {
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center'
+        });
+
+        Object.assign(videoContainer.style, {
+            flex: '1',
+            width: '100%',
+            maxWidth: '100%',
+            padding: '0'
+        });
+
+        if (controlBar) {
+            styleControlBar(controlBar);
+        }
+
+        const subtitleContainer = createSubtitleContainer();
+        Object.assign(subtitleContainer.style, {
+            position: 'fixed',
+            bottom: '10%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: 'rgba(20, 20, 19, 0.82)',
+            color: YOUTUBE_OVERLAY_UI.ivory,
+            padding: '15px 30px',
+            borderRadius: '14px',
+            maxWidth: '80%',
+            textAlign: 'center',
+            zIndex: '114514'
+        });
+
+        const subtitleText = subtitleContainer.querySelector('#overlay-subtitle-text');
+        if (subtitleText) {
+            subtitleText.style.color = YOUTUBE_OVERLAY_UI.ivory;
+        }
+
+        overlay.appendChild(subtitleContainer);
+    }
+
+    function applyReadingMode(overlay, videoContainer, controlBar) {
+        Object.assign(overlay.style, {
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            justifyContent: 'center'
+        });
+
+        Object.assign(videoContainer.style, {
+            flex: '0 0 50%',
+            maxWidth: '50%',
+            padding: '20px'
+        });
+
+        if (controlBar) {
+            styleControlBar(controlBar);
+        }
+
+        const subtitleListContainer = createSubtitleListContainer();
+        Object.assign(subtitleListContainer.style, {
+            flex: '0 0 50%',
+            maxWidth: '50%',
+            height: 'calc(100vh - 80px)',
+            overflow: 'auto',
+            padding: '24px 24px 96px',
+            boxSizing: 'border-box',
+            backgroundColor: YOUTUBE_OVERLAY_UI.ivory,
+            marginBottom: '80px'
+        });
+
+        overlay.appendChild(subtitleListContainer);
+    }
+
+    function applyHybridMode(overlay, videoContainer, controlBar) {
+        Object.assign(overlay.style, {
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            justifyContent: 'flex-start'
+        });
+
+        if (controlBar) {
+            styleControlBar(controlBar);
+        }
+
+        const leftContainer = document.createElement('div');
+        leftContainer.id = 'overlay-left-container';
+        Object.assign(leftContainer.style, {
+            flex: '0 0 60%',
+            maxWidth: '60%',
+            height: 'calc(100vh - 80px)',
+            display: 'flex',
+            flexDirection: 'column',
+            marginBottom: '80px'
+        });
+
+        Object.assign(videoContainer.style, {
+            flex: '0 0 auto',
+            width: '100%',
+            maxWidth: '100%',
+            padding: '20px'
+        });
+
+        const subtitleContainer = createSubtitleContainer();
+        Object.assign(subtitleContainer.style, {
+            flex: '1',
+            padding: '20px',
+            minHeight: '100px',
+            backgroundColor: YOUTUBE_OVERLAY_UI.warmSand,
+            borderTop: '1px solid ' + YOUTUBE_OVERLAY_UI.borderWarm
+        });
+
+        const rightContainer = document.createElement('div');
+        rightContainer.id = 'overlay-right-container';
+        Object.assign(rightContainer.style, {
+            flex: '0 0 40%',
+            maxWidth: '40%',
+            height: 'calc(100vh - 80px)',
+            overflow: 'auto',
+            padding: '24px 24px 96px',
+            boxSizing: 'border-box',
+            backgroundColor: YOUTUBE_OVERLAY_UI.ivory,
+            marginBottom: '80px'
+        });
+
+        const subtitleListContainer = createSubtitleListContainer();
+        rightContainer.appendChild(subtitleListContainer);
+
+        leftContainer.appendChild(videoContainer);
+        leftContainer.appendChild(subtitleContainer);
+
+        overlay.appendChild(leftContainer);
+        overlay.appendChild(rightContainer);
+    }
+
+    function applyMobileTheaterMode(overlay, videoContainer, controlBar) {
+        Object.assign(overlay.style, {
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'flex-start'
+        });
+
+        Object.assign(videoContainer.style, {
+            flex: '0 0 40%',
+            width: '100%',
+            padding: '10px'
+        });
+
+        if (controlBar) {
+            styleControlBar(controlBar);
+        }
+
+        const subtitleContainer = createSubtitleContainer();
+        Object.assign(subtitleContainer.style, {
+            flex: '1',
+            width: '100%',
+            padding: '15px',
+            boxSizing: 'border-box',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: YOUTUBE_OVERLAY_UI.warmSand,
+            marginBottom: '80px'
+        });
+
+        overlay.appendChild(subtitleContainer);
+    }
+
+    function applyMobileReadingMode(overlay, videoContainer, controlBar) {
+        Object.assign(overlay.style, {
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'flex-start'
+        });
+
+        Object.assign(videoContainer.style, {
+            flex: '0 0 40%',
+            width: '100%',
+            padding: '10px'
+        });
+
+        if (controlBar) {
+            styleControlBar(controlBar);
+        }
+
+        const subtitleListContainer = createSubtitleListContainer();
+        Object.assign(subtitleListContainer.style, {
+            flex: '1',
+            width: '100%',
+            height: 'calc(100vh - 80px)',
+            overflow: 'auto',
+            padding: '15px',
+            boxSizing: 'border-box',
+            backgroundColor: YOUTUBE_OVERLAY_UI.ivory,
+            marginBottom: '80px'
+        });
+
+        overlay.appendChild(subtitleListContainer);
+    }
+
+    function createSubtitleContainer() {
+        const container = document.createElement('div');
+        container.id = 'overlay-subtitle-container';
+        const subtitleText = document.createElement('div');
+        subtitleText.id = 'overlay-subtitle-text';
+        Object.assign(subtitleText.style, {
+            fontSize: '24px',
+            fontFamily: 'Georgia, Times New Roman, serif',
+            lineHeight: '1.6',
+            textAlign: 'center',
+            color: YOUTUBE_OVERLAY_UI.charcoal
+        });
+        container.appendChild(subtitleText);
+        return container;
+    }
+
+    function createSubtitleListContainer() {
+        const container = document.createElement('div');
+        container.id = 'overlay-subtitle-list-container';
+        const subtitleList = document.createElement('div');
+        subtitleList.id = 'overlay-subtitle-list';
+        Object.assign(subtitleList.style, {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px'
+        });
+        container.appendChild(subtitleList);
+        return container;
+    }
+
+    function updateSubtitleDisplay() {
+        const currentSentence = getCurrentSubtitles();
+        const subtitleText = document.getElementById('overlay-subtitle-text');
+        const subtitleList = document.getElementById('overlay-subtitle-list');
+
+        if (subtitleText && currentSentence) {
+            if (currentSentence.text !== lastOverlaySubtitleText) {
+                lastOverlaySubtitleText = currentSentence.text;
+                subtitleText.textContent = currentSentence.text;
+            }
+        }
+
+        if (subtitleList && rebuiltSubtitles.length > 0) {
+            updateSubtitleList(subtitleList, currentSentence);
+        }
+    }
+
+    function updateSubtitleList(subtitleList, currentSentence) {
+        const currentTime = getYoutubeCurrentTime();
+        const video = getVideoElement();
+        const shouldAutoFollow = readingSubtitleAutoFollow && video && !video.paused && !video.ended;
+
+        if (!subtitleListInitialized) {
+            const sentences = extractAllSentences(rebuiltSubtitles);
+            subtitleListItems = [];
+
+            sentences.forEach((sentence, index) => {
+                const item = document.createElement('div');
+                item.className = 'subtitle-item';
+                item.dataset.startTime = sentence.startTime;
+                item.dataset.endTime = sentence.endTime;
+                Object.assign(item.style, {
+                    padding: '12px 14px',
+                    backgroundColor: YOUTUBE_OVERLAY_UI.ivory,
+                    border: '1px solid ' + YOUTUBE_OVERLAY_UI.borderCream,
+                    borderRadius: '12px',
+                    boxShadow: '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.borderCream,
+                    transition: 'background 180ms ease, border-color 180ms ease, box-shadow 180ms ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                });
+
+                const playBtn = document.createElement('button');
+                playBtn.innerHTML = youtubeOverlayIcon('play', 14);
+                playBtn.setAttribute('aria-label', 'Play subtitle from here');
+                playBtn.title = 'Play from here';
+                Object.assign(playBtn.style, {
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    backgroundColor: YOUTUBE_OVERLAY_UI.warmSand,
+                    color: YOUTUBE_OVERLAY_UI.charcoal,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0',
+                    boxShadow: '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.ringWarm,
+                    transition: 'transform 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease',
+                    flex: '0 0 34px'
+                });
+
+                playBtn.addEventListener('mouseenter', () => {
+                    playBtn.style.transform = 'translateY(-1px)';
+                    playBtn.style.backgroundColor = YOUTUBE_OVERLAY_UI.terracotta;
+                    playBtn.style.color = YOUTUBE_OVERLAY_UI.ivory;
+                    playBtn.style.boxShadow = '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.terracotta + ', 0 8px 18px rgba(201, 100, 66, 0.2)';
+                });
+
+                playBtn.addEventListener('mouseleave', () => {
+                    playBtn.style.transform = 'translateY(0)';
+                    playBtn.style.backgroundColor = YOUTUBE_OVERLAY_UI.warmSand;
+                    playBtn.style.color = YOUTUBE_OVERLAY_UI.charcoal;
+                    playBtn.style.boxShadow = '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.ringWarm;
+                });
+
+                playBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    setYoutubeTime(sentence.startTime);
+                    playVideo();
+                });
+
+                const text = document.createElement('div');
+                text.textContent = sentence.text;
+                Object.assign(text.style, {
+                    flex: '1',
+                    fontSize: '14px',
+                    lineHeight: '1.55',
+                    color: YOUTUBE_OVERLAY_UI.charcoal
+                });
+
+                item.appendChild(playBtn);
+                item.appendChild(text);
+
+                subtitleList.appendChild(item);
+                subtitleListItems.push({
+                    element: item,
+                    sentence: sentence
+                });
+            });
+
+            subtitleListInitialized = true;
+        }
+
+        subtitleListItems.forEach(({ element, sentence }) => {
+            const isActive = currentTime >= sentence.startTime && currentTime <= sentence.endTime;
+            element.style.backgroundColor = isActive ? '#fff7f1' : YOUTUBE_OVERLAY_UI.ivory;
+            element.style.borderColor = isActive ? YOUTUBE_OVERLAY_UI.terracotta : YOUTUBE_OVERLAY_UI.borderCream;
+            element.style.boxShadow = isActive ? '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.terracotta + ', 0 8px 22px rgba(201, 100, 66, 0.12)' : '0 0 0 1px ' + YOUTUBE_OVERLAY_UI.borderCream;
+
+            if (isActive && shouldAutoFollow) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+    }
+
+    function extractAllSentences(subtitles) {
+        const sentences = [];
+        const punctuationRegex = getPunctuationRegex();
+        let currentSentenceWords = [];
+        let currentStartTime = 0;
+        let currentEndTime = 0;
+
+        for (let i = 0; i < subtitles.length; i++) {
+            const element = subtitles[i];
+
+            if (Array.isArray(element)) {
+                if (element.length > 0) {
+                    const punctuation = element[0];
+                    if (punctuationRegex.test(punctuation) && currentSentenceWords.length > 0) {
+                        const sentenceText = mergeWordsIntoSentences(currentSentenceWords);
+                        sentences.push({
+                            text: sentenceText,
+                            startTime: currentStartTime,
+                            endTime: currentEndTime,
+                            words: currentSentenceWords
+                        });
+                        currentSentenceWords = [];
+                    }
+                }
+                continue;
+            }
+
+            if (currentSentenceWords.length === 0) {
+                currentStartTime = element.tStartMs;
+            }
+            currentEndTime = element.tEndMs;
+
+            const wordItem = {
+                originalIndex: i,
+                data: element
+            };
+
+            currentSentenceWords.push(wordItem);
+
+            if (element.utf8) {
+                const lastChar = element.utf8.charAt(element.utf8.length - 1);
+                if (punctuationRegex.test(lastChar)) {
+                    const sentenceText = mergeWordsIntoSentences(currentSentenceWords);
+                    sentences.push({
+                        text: sentenceText,
+                        startTime: currentStartTime,
+                        endTime: currentEndTime,
+                        words: currentSentenceWords
+                    });
+                    currentSentenceWords = [];
+                }
+            }
+        }
+
+        if (currentSentenceWords.length > 0) {
+            const sentenceText = mergeWordsIntoSentences(currentSentenceWords);
+            sentences.push({
+                text: sentenceText,
+                startTime: currentStartTime,
+                endTime: currentEndTime,
+                words: currentSentenceWords
+            });
+        }
+
+        return sentences;
+    }
+
+    function startSubtitleUpdate() {
+        if (subtitleUpdateInterval) {
+            clearInterval(subtitleUpdateInterval);
+        }
+
+        subtitleUpdateInterval = setInterval(() => {
+            updateSubtitleDisplay();
+        }, 100);
+    }
+
+    function stopSubtitleUpdate() {
+        if (subtitleUpdateInterval) {
+            clearInterval(subtitleUpdateInterval);
+            subtitleUpdateInterval = null;
+        }
+    }
+})();

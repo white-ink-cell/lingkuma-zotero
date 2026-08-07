@@ -1,0 +1,22 @@
+{
+  "manifest_version": 2,
+  "name": "LingKuma for Zotero",
+  "version": "1.0.1",
+  "description": "Unofficial Zotero port of LingKuma with PDF/EPUB reading support and multilingual translation.",
+  "author": "white-ink-cell",
+  "homepage_url": "https://github.com/white-ink-cell/lingkuma-zotero",
+  "icons": {
+    "16": "upstream/src/icons/icon16.png",
+    "32": "upstream/src/icons/icon32.png",
+    "48": "upstream/src/icons/icon48.png",
+    "128": "upstream/src/icons/icon128.png"
+  },
+  "applications": {
+    "zotero": {
+      "id": "lingkuma-zotero@white-ink-cell",
+      "update_url": "https://raw.githubusercontent.com/white-ink-cell/lingkuma-zotero/main/updates.json",
+      "strict_min_version": "9.0",
+      "strict_max_version": "9.0.*"
+    }
+  }
+}

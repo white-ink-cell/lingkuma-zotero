@@ -1,0 +1,353 @@
+<vbox xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+      xmlns:html="http://www.w3.org/1999/xhtml"
+      id="lingkuma-zotero-prefs-root"
+      flex="1"
+      onload="window.LingKumaZoteroPrefs &amp;&amp; window.LingKumaZoteroPrefs.init()">
+  <html:div id="lk-settings-app" class="lk-app" data-theme="light">
+    <html:aside class="lk-sidebar">
+      <html:div class="lk-brand">
+        <html:div class="lk-brand-mark">熊</html:div>
+        <html:div>
+          <html:strong>LingKuma</html:strong>
+          <html:span>for Zotero 1.0.1</html:span>
+        </html:div>
+      </html:div>
+
+      <html:nav class="lk-nav" aria-label="LingKuma 设置导航">
+        <html:div class="lk-nav-group">
+          <html:button type="button" class="lk-nav-heading" data-lk-toggle-group="database">数据库操作 <html:span>▾</html:span></html:button>
+          <html:div class="lk-nav-sub" data-lk-group="database">
+            <html:button type="button" data-lk-page="cloud">Cloud Database</html:button>
+            <html:button type="button" data-lk-page="webdav">WebDAV</html:button>
+            <html:button type="button" data-lk-page="word-operations">单词库操作</html:button>
+            <html:button type="button" data-lk-page="import">导入已知单词</html:button>
+            <html:button type="button" data-lk-page="backup">备份数据</html:button>
+          </html:div>
+        </html:div>
+
+        <html:div class="lk-nav-group">
+          <html:button type="button" class="lk-nav-heading" data-lk-toggle-group="api">API 配置 <html:span>▾</html:span></html:button>
+          <html:div class="lk-nav-sub" data-lk-group="api">
+            <html:button type="button" data-lk-page="api-basic">基本设置</html:button>
+            <html:button type="button" data-lk-page="prompt-word">单词解释</html:button>
+            <html:button type="button" data-lk-page="prompt-word2">第二个单词解释</html:button>
+            <html:button type="button" data-lk-page="prompt-language">语言检测</html:button>
+            <html:button type="button" data-lk-page="prompt-tag">词性标签</html:button>
+            <html:button type="button" data-lk-page="prompt-sentence">例句翻译</html:button>
+            <html:button type="button" data-lk-page="prompt-analysis">句子解析</html:button>
+            <html:button type="button" data-lk-page="prompt-sidebar">侧边栏解析</html:button>
+          </html:div>
+        </html:div>
+
+        <html:div class="lk-nav-group">
+          <html:button type="button" class="lk-nav-heading" data-lk-toggle-group="wordlist">单词列表 <html:span>▾</html:span></html:button>
+          <html:div class="lk-nav-sub" data-lk-group="wordlist">
+            <html:button type="button" data-lk-page="word-list">本地词库</html:button>
+            <html:button type="button" data-lk-page="statistics">学习统计</html:button>
+          </html:div>
+        </html:div>
+
+        <html:div class="lk-nav-group">
+          <html:button type="button" class="lk-nav-heading" data-lk-toggle-group="tts">TTS 配置 <html:span>▾</html:span></html:button>
+          <html:div class="lk-nav-sub" data-lk-group="tts">
+            <html:button type="button" data-lk-page="tts-basic">基本设置</html:button>
+            <html:button type="button" data-lk-page="tts-local">本地 TTS</html:button>
+            <html:button type="button" data-lk-page="tts-edge">Edge TTS</html:button>
+            <html:button type="button" data-lk-page="tts-gpt">GPT TTS</html:button>
+            <html:button type="button" data-lk-page="tts-custom">自定义 URL</html:button>
+          </html:div>
+        </html:div>
+
+        <html:div class="lk-nav-group">
+          <html:button type="button" class="lk-nav-heading" data-lk-toggle-group="popup">弹窗设置 <html:span>▾</html:span></html:button>
+          <html:div class="lk-nav-sub" data-lk-group="popup">
+            <html:button type="button" data-lk-page="basic" class="active">基础设置</html:button>
+            <html:button type="button" data-lk-page="popup-layout">弹窗行为</html:button>
+            <html:button type="button" data-lk-page="background">背景设置</html:button>
+            <html:button type="button" data-lk-page="capsules">自定义胶囊</html:button>
+          </html:div>
+        </html:div>
+
+        <html:button type="button" class="lk-nav-single" data-lk-page="epub">EPUB 文本修复</html:button>
+        <html:button type="button" class="lk-nav-single" data-lk-page="about">关于</html:button>
+      </html:nav>
+    </html:aside>
+
+    <html:main class="lk-main">
+      <html:header class="lk-topbar">
+        <html:div>
+          <html:div class="lk-eyebrow">LINGKUMA SETTINGS</html:div>
+          <html:h1 id="lk-page-title">基础设置</html:h1>
+        </html:div>
+        <html:div class="lk-top-actions">
+          <html:button type="button" class="lk-icon-button" data-lk-action="theme-light" title="浅色模式">☀</html:button>
+          <html:button type="button" class="lk-icon-button" data-lk-action="theme-dark" title="深色模式">☾</html:button>
+          <html:select id="lk-ui-language" class="lk-language-select" title="界面语言" data-lk-key="interfaceLanguage">
+            <html:option value="auto">自动 / Auto</html:option>
+            <html:option value="zh">中文</html:option>
+            <html:option value="en">English</html:option>
+          </html:select>
+        </html:div>
+      </html:header>
+      <html:div id="lk-settings-status" class="lk-status">正在载入设置……</html:div>
+
+      <!-- 基础设置 -->
+      <html:section class="lk-page active" data-lk-page-panel="basic" data-title="基础设置">
+        <html:div class="lk-hero-card">
+          <html:div>
+            <html:span class="lk-kicker">LINGKUMA POPUP</html:span>
+            <html:h2>LingKuma helps you<br/>reading easy and fast.</html:h2>
+          </html:div>
+          <html:div class="lk-hero-actions">
+            <html:button type="button" data-lk-action="open-vocabulary">词库</html:button>
+            <html:button type="button" data-lk-action="apply-now">应用</html:button>
+            <html:button type="button" data-lk-action="diagnostic">诊断</html:button>
+          </html:div>
+        </html:div>
+
+        <html:div class="lk-card">
+          <html:h3>基础设置</html:h3>
+          <html:div class="lk-setting-row">
+            <html:div><html:strong>单词高亮</html:strong><html:span>在 Zotero PDF 和 EPUB 中标记未知词与学习中词汇。</html:span></html:div>
+            <html:label class="lk-switch"><html:input type="checkbox" data-lk-key="enablePlugin"/><html:span></html:span></html:label>
+          </html:div>
+          <html:div class="lk-setting-row">
+            <html:div><html:strong>Kuma 悬浮开关</html:strong><html:span>显示阅读页面上的 Kuma、明暗与收起控制。</html:span></html:div>
+            <html:label class="lk-switch"><html:input type="checkbox" data-lk-key="wordHighlightFloatingButtonEnabled"/><html:span></html:span></html:label>
+          </html:div>
+          <html:div class="lk-setting-row">
+            <html:div><html:strong>单词爆炸 💥</html:strong><html:span>点击单词时显示整句翻译和句内词汇列表。</html:span></html:div>
+            <html:label class="lk-switch"><html:input type="checkbox" data-lk-key="wordExplosionEnabled"/><html:span></html:span></html:label>
+          </html:div>
+          <html:div class="lk-setting-row">
+            <html:div><html:strong>词性高亮</html:strong><html:span>保留原版词性标签与学习状态高亮。</html:span></html:div>
+            <html:label class="lk-switch"><html:input type="checkbox" data-lk-key="highlightAlphabeticEnabled"/><html:span></html:span></html:label>
+          </html:div>
+          <html:div class="lk-setting-row">
+            <html:div><html:strong>整句中显示原文</html:strong><html:span>在整句翻译上方显示被识别的原句。</html:span></html:div>
+            <html:label class="lk-switch"><html:input type="checkbox" data-lk-key="showExplosionSentence"/><html:span></html:span></html:label>
+          </html:div>
+        </html:div>
+
+        <html:div class="lk-card">
+          <html:h3>语言与 AI</html:h3>
+          <html:div class="lk-grid two">
+            <html:label class="lk-field"><html:span>目标语言</html:span>
+              <html:select data-lk-object="translationConfig" data-lk-subkey="targetLanguage">
+                <html:option value="zh-CN">简体中文</html:option>
+                <html:option value="zh-TW">繁體中文</html:option>
+                <html:option value="en">English</html:option>
+                <html:option value="de">Deutsch</html:option>
+                <html:option value="fr">Français</html:option>
+                <html:option value="es">Español</html:option>
+                <html:option value="ja">日本語</html:option>
+                <html:option value="ko">한국어</html:option>
+                <html:option value="ru">Русский</html:option>
+                <html:option value="it">Italiano</html:option>
+                <html:option value="pt">Português</html:option>
+              </html:select>
+            </html:label>
+            <html:label class="lk-field"><html:span>第一条 AI 释义</html:span><html:input type="checkbox" data-lk-key="autoRequestAITranslations"/></html:label>
+            <html:label class="lk-field"><html:span>第二条 AI 释义</html:span><html:input type="checkbox" data-lk-key="autoRequestAITranslations2"/></html:label>
+            <html:label class="lk-field"><html:span>自动保存未知词释义</html:span><html:input type="checkbox" data-lk-key="autoAddAITranslationsFromUnknown"/></html:label>
+            <html:label class="lk-field"><html:span>默认展开释义胶囊</html:span><html:input type="checkbox" data-lk-key="defaultExpandCapsule"/></html:label>
+            <html:label class="lk-field"><html:span>中文高亮</html:span><html:input type="checkbox" data-lk-key="highlightChineseEnabled"/></html:label>
+            <html:label class="lk-field"><html:span>日语高亮</html:span><html:input type="checkbox" data-lk-key="highlightJapaneseEnabled"/></html:label>
+            <html:label class="lk-field"><html:span>韩语高亮</html:span><html:input type="checkbox" data-lk-key="highlightKoreanEnabled"/></html:label>
+          </html:div>
+        </html:div>
+      </html:section>
+
+      <!-- Cloud Database -->
+      <html:section class="lk-page" data-lk-page-panel="cloud" data-title="Cloud Database">
+        <html:div class="lk-card lk-donation-card">
+          <html:h2>捐赠与账号</html:h2>
+          <html:p>LingKuma 上游项目采用 MIT 许可证。这里保留原设置页的入口，但 Zotero 移植版不代替上游作者提供账号服务。</html:p>
+          <html:div class="lk-button-row">
+            <html:button type="button" class="lk-button purple" data-lk-action="open-afdian">爱发电 (afdian)</html:button>
+            <html:button type="button" class="lk-button green" data-lk-action="open-upstream">LingKuma GitHub</html:button>
+          </html:div>
+        </html:div>
+        <html:div class="lk-card">
+          <html:h3>服务器配置</html:h3>
+          <html:div class="lk-setting-row"><html:div><html:strong>启用云端数据库</html:strong><html:span>仅保存配置。上游账号登录接口尚未接入 Zotero。</html:span></html:div><html:label class="lk-switch"><html:input type="checkbox" data-lk-key="cloudDbEnabled"/><html:span></html:span></html:label></html:div>
+          <html:div class="lk-setting-row"><html:div><html:strong>启用双写</html:strong><html:span>同时保留本地词库与云端副本。</html:span></html:div><html:label class="lk-switch"><html:input type="checkbox" data-lk-key="cloudDualWrite"/><html:span></html:span></html:label></html:div>
+          <html:div class="lk-setting-row"><html:div><html:strong>自建服务器</html:strong><html:span>保存自建 LingKuma 服务地址。</html:span></html:div><html:label class="lk-switch"><html:input type="checkbox" data-lk-key="cloudSelfHosted"/><html:span></html:span></html:label></html:div>
+          <html:label class="lk-field"><html:span>服务器 URL</html:span><html:input type="text" data-lk-key="cloudServerUrl" placeholder="https://example.com"/></html:label>
+          <html:div class="lk-note warning">Zotero 版当前可直接使用下方 WebDAV 完成跨设备词库与设置备份。Cloud Database 登录和付费账号验证仍属于浏览器扩展专属服务。</html:div>
+        </html:div>
+      </html:section>
+
+      <!-- WebDAV -->
+      <html:section class="lk-page" data-lk-page-panel="webdav" data-title="WebDAV">
+        <html:div class="lk-card">
+          <html:h3>WebDAV 配置</html:h3>
+          <html:div class="lk-grid two">
+            <html:label class="lk-field full"><html:span>WebDAV 目录 URL</html:span><html:input id="lk-webdav-url" type="text" data-lk-object="webdavConfig" data-lk-subkey="url" placeholder="https://dav.example.com/LingKuma/"/></html:label>
+            <html:label class="lk-field"><html:span>账号</html:span><html:input type="text" data-lk-object="webdavConfig" data-lk-subkey="username"/></html:label>
+            <html:label class="lk-field"><html:span>密码或应用专用密码</html:span><html:input type="password" data-lk-object="webdavConfig" data-lk-subkey="password"/></html:label>
+            <html:label class="lk-field full"><html:span>备份文件名</html:span><html:input type="text" data-lk-object="webdavConfig" data-lk-subkey="filename" placeholder="lingkuma-zotero-backup.json"/></html:label>
+          </html:div>
+          <html:div class="lk-button-row">
+            <html:button type="button" class="lk-button" data-lk-action="webdav-test">测试连接</html:button>
+            <html:button type="button" class="lk-button primary" data-lk-action="webdav-upload">上传本地数据</html:button>
+            <html:button type="button" class="lk-button" data-lk-action="webdav-download-merge">下载并合并</html:button>
+            <html:button type="button" class="lk-button danger" data-lk-action="webdav-download-replace">下载并替换</html:button>
+          </html:div>
+          <html:div id="lk-webdav-status" class="lk-note">WebDAV 凭据保存在 Zotero 数据目录中的 LingKuma 状态文件内。</html:div>
+        </html:div>
+      </html:section>
+
+      <!-- 单词库操作 -->
+      <html:section class="lk-page" data-lk-page-panel="word-operations" data-title="单词库操作">
+        <html:div class="lk-card">
+          <html:h3>数据库概况</html:h3>
+          <html:div class="lk-stat-grid">
+            <html:div class="lk-stat"><html:strong id="lk-word-count">0</html:strong><html:span>词条总数</html:span></html:div>
+            <html:div class="lk-stat"><html:strong id="lk-sentence-count">0</html:strong><html:span>例句总数</html:span></html:div>
+            <html:div class="lk-stat"><html:strong id="lk-learned-count">0</html:strong><html:span>状态 4–5</html:span></html:div>
+          </html:div>
+        </html:div>
+        <html:div class="lk-card">
+          <html:h3>清理操作</html:h3>
+          <html:label class="lk-field"><html:span>每个词最多保留的例句数量</html:span><html:input id="lk-keep-sentences" type="number" min="0" max="20" value="3"/></html:label>
+          <html:div class="lk-button-row">
+            <html:button type="button" class="lk-button" data-lk-action="trim-sentences">清理多余例句</html:button>
+            <html:button type="button" class="lk-button" data-lk-action="reset-minimized">恢复完整单词弹窗</html:button>
+            <html:button type="button" class="lk-button danger" data-lk-action="clear-words">清空本地词库</html:button>
+          </html:div>
+        </html:div>
+      </html:section>
+
+      <!-- 导入 -->
+      <html:section class="lk-page" data-lk-page-panel="import" data-title="导入已知单词">
+        <html:div class="lk-card">
+          <html:h3>导入词汇</html:h3>
+          <html:p class="lk-muted">支持 LingKuma JSON、Zotero 版备份 JSON，或每行一个单词。纯单词列表会按“已掌握 5”导入。</html:p>
+          <html:input id="lk-import-file" type="file" accept=".json,.txt,.csv"/>
+          <html:textarea id="lk-import-text" class="lk-textarea tall" placeholder="粘贴 JSON，或每行输入一个单词"></html:textarea>
+          <html:div class="lk-grid two compact">
+            <html:label class="lk-field"><html:span>导入方式</html:span><html:select id="lk-import-mode"><html:option value="merge">合并，不覆盖已有记录</html:option><html:option value="replace">替换全部词库</html:option></html:select></html:label>
+            <html:label class="lk-field"><html:span>纯词表状态</html:span><html:select id="lk-import-status"><html:option value="5">5 完全掌握</html:option><html:option value="4">4 几乎掌握</html:option><html:option value="1">1 学习中</html:option><html:option value="0">0 未知</html:option></html:select></html:label>
+          </html:div>
+          <html:div class="lk-button-row"><html:button type="button" class="lk-button primary" data-lk-action="import-words">开始导入</html:button><html:button type="button" class="lk-button" data-lk-action="clear-import">清空输入</html:button></html:div>
+        </html:div>
+      </html:section>
+
+      <!-- 备份 -->
+      <html:section class="lk-page" data-lk-page-panel="backup" data-title="备份数据">
+        <html:div class="lk-card">
+          <html:h3>词库与设置备份</html:h3>
+          <html:p class="lk-muted">备份内容包括词汇状态、释义、例句、标签及全部 Zotero 适配设置。</html:p>
+          <html:div class="lk-button-row">
+            <html:button type="button" class="lk-button primary" data-lk-action="copy-full-backup">复制完整备份 JSON</html:button>
+            <html:button type="button" class="lk-button" data-lk-action="copy-settings-backup">仅复制设置 JSON</html:button>
+          </html:div>
+          <html:textarea id="lk-backup-text" class="lk-textarea tall" placeholder="点击上方按钮生成备份；也可以粘贴备份后恢复。"></html:textarea>
+          <html:div class="lk-button-row">
+            <html:button type="button" class="lk-button" data-lk-action="restore-merge">恢复并合并</html:button>
+            <html:button type="button" class="lk-button danger" data-lk-action="restore-replace">恢复并替换</html:button>
+          </html:div>
+        </html:div>
+      </html:section>
+
+      <!-- API 基本 -->
+      <html:section class="lk-page" data-lk-page-panel="api-basic" data-title="API 配置 · 基本设置">
+        <html:div class="lk-card">
+          <html:h3>AI Provider</html:h3>
+          <html:label class="lk-field"><html:span>AI 通道</html:span><html:select data-lk-object="aiConfig" data-lk-subkey="aiChannel"><html:option value="diy">LingKuma 默认免费 AI / 自定义兼容接口</html:option><html:option value="zerozero">0-0 API</html:option><html:option value="ohmygpt">OhMyGPT</html:option></html:select></html:label>
+          <html:div class="lk-grid two">
+            <html:label class="lk-field full"><html:span>OpenAI-compatible Base URL</html:span><html:input type="text" data-lk-object="aiConfig" data-lk-subkey="apiBaseURL" placeholder="留空使用 LingKuma 默认免费 AI"/></html:label>
+            <html:label class="lk-field"><html:span>模型</html:span><html:input type="text" data-lk-object="aiConfig" data-lk-subkey="apiModel" placeholder="留空使用默认模型"/></html:label>
+            <html:label class="lk-field"><html:span>Temperature</html:span><html:input type="number" min="0" max="2" step="0.1" data-lk-object="aiConfig" data-lk-subkey="apiTemperature" data-lk-type="number"/></html:label>
+            <html:label class="lk-field full"><html:span>API Key</html:span><html:input type="password" data-lk-object="aiConfig" data-lk-subkey="apiKey" placeholder="留空使用默认免费 AI"/></html:label>
+          </html:div>
+          <html:div class="lk-note">只有填写自定义 Base URL 时，插件才切换到你自己的 API。留空时继续使用从 LingKuma 源码移植的默认服务。</html:div>
+        </html:div>
+      </html:section>
+
+      <!-- Prompt sections -->
+      <html:section class="lk-page" data-lk-page-panel="prompt-word" data-title="API 配置 · 单词解释">
+        <html:div class="lk-card"><html:h3>单词解释 AI 提示词</html:h3><html:textarea class="lk-textarea prompt" data-lk-key="aiPrompt" placeholder="留空使用 LingKuma 原版默认提示词"></html:textarea><html:button type="button" class="lk-button" data-lk-action="clear-setting" data-key="aiPrompt">恢复默认提示词</html:button></html:div>
+      </html:section>
+      <html:section class="lk-page" data-lk-page-panel="prompt-word2" data-title="API 配置 · 第二个单词解释">
+        <html:div class="lk-card"><html:h3>第二个单词解释 AI 提示词</html:h3><html:textarea class="lk-textarea prompt" data-lk-key="aiPrompt2" placeholder="留空使用 LingKuma 原版默认提示词"></html:textarea><html:button type="button" class="lk-button" data-lk-action="clear-setting" data-key="aiPrompt2">恢复默认提示词</html:button></html:div>
+      </html:section>
+      <html:section class="lk-page" data-lk-page-panel="prompt-language" data-title="API 配置 · 语言检测">
+        <html:div class="lk-card"><html:h3>语言检测 AI 提示词</html:h3><html:textarea class="lk-textarea prompt" data-lk-key="aiLanguageDetectionPrompt" placeholder="留空使用 LingKuma 原版默认提示词"></html:textarea><html:button type="button" class="lk-button" data-lk-action="clear-setting" data-key="aiLanguageDetectionPrompt">恢复默认提示词</html:button></html:div>
+      </html:section>
+      <html:section class="lk-page" data-lk-page-panel="prompt-tag" data-title="API 配置 · 词性标签">
+        <html:div class="lk-card"><html:h3>词性标签分析提示词</html:h3><html:textarea class="lk-textarea prompt" data-lk-key="aiTagAnalysisPrompt" placeholder="留空使用 LingKuma 原版默认提示词"></html:textarea><html:button type="button" class="lk-button" data-lk-action="clear-setting" data-key="aiTagAnalysisPrompt">恢复默认提示词</html:button></html:div>
+      </html:section>
+      <html:section class="lk-page" data-lk-page-panel="prompt-sentence" data-title="API 配置 · 例句翻译">
+        <html:div class="lk-card"><html:h3>例句与整句翻译提示词</html:h3><html:textarea class="lk-textarea prompt" data-lk-key="aiSentenceTranslationPrompt" placeholder="留空使用 LingKuma 原版默认提示词"></html:textarea><html:button type="button" class="lk-button" data-lk-action="clear-setting" data-key="aiSentenceTranslationPrompt">恢复默认提示词</html:button></html:div>
+      </html:section>
+      <html:section class="lk-page" data-lk-page-panel="prompt-analysis" data-title="API 配置 · 句子解析">
+        <html:div class="lk-card"><html:h3>句子解析 AI 提示词</html:h3><html:textarea class="lk-textarea prompt" data-lk-key="aiAnalysisPrompt" placeholder="留空使用 LingKuma 原版默认提示词"></html:textarea><html:button type="button" class="lk-button" data-lk-action="clear-setting" data-key="aiAnalysisPrompt">恢复默认提示词</html:button></html:div>
+      </html:section>
+      <html:section class="lk-page" data-lk-page-panel="prompt-sidebar" data-title="API 配置 · 侧边栏解析">
+        <html:div class="lk-card"><html:h3>侧边栏 AI 解析提示词</html:h3><html:textarea class="lk-textarea prompt" data-lk-key="sidebarAIPrompt" placeholder="留空使用 LingKuma 原版默认提示词"></html:textarea><html:button type="button" class="lk-button" data-lk-action="clear-setting" data-key="sidebarAIPrompt">恢复默认提示词</html:button></html:div>
+      </html:section>
+
+      <!-- Word list -->
+      <html:section class="lk-page" data-lk-page-panel="word-list" data-title="本地词库">
+        <html:div class="lk-card">
+          <html:div class="lk-card-header"><html:h3>本地词条</html:h3><html:button type="button" class="lk-button" data-lk-action="refresh-word-list">刷新</html:button></html:div>
+          <html:div class="lk-grid three compact">
+            <html:label class="lk-field full"><html:span>搜索</html:span><html:input id="lk-word-search" type="search" placeholder="单词、释义、标签"/></html:label>
+            <html:label class="lk-field"><html:span>状态</html:span><html:select id="lk-word-status-filter"><html:option value="all">全部状态</html:option><html:option value="0">0 未知</html:option><html:option value="1">1 学习中</html:option><html:option value="2">2 熟悉</html:option><html:option value="3">3 认识</html:option><html:option value="4">4 几乎掌握</html:option><html:option value="5">5 完全掌握</html:option></html:select></html:label>
+            <html:label class="lk-field"><html:span>每页</html:span><html:select id="lk-word-page-size"><html:option value="20">20</html:option><html:option value="50">50</html:option><html:option value="100">100</html:option></html:select></html:label>
+          </html:div>
+          <html:div class="lk-table-wrap"><html:table class="lk-table"><html:thead><html:tr><html:th>单词</html:th><html:th>状态</html:th><html:th>释义</html:th><html:th>例句</html:th><html:th>操作</html:th></html:tr></html:thead><html:tbody id="lk-word-table-body"></html:tbody></html:table></html:div>
+          <html:div class="lk-pagination"><html:button type="button" class="lk-button" data-lk-action="word-prev">上一页</html:button><html:span id="lk-word-page-info">第 1 页</html:span><html:button type="button" class="lk-button" data-lk-action="word-next">下一页</html:button></html:div>
+        </html:div>
+      </html:section>
+
+      <html:section class="lk-page" data-lk-page-panel="statistics" data-title="学习统计">
+        <html:div class="lk-card"><html:h3>当前词库统计</html:h3><html:div id="lk-status-stats" class="lk-stat-grid six"></html:div></html:div>
+        <html:div class="lk-card"><html:h3>语言分布</html:h3><html:div id="lk-language-stats" class="lk-list"></html:div></html:div>
+      </html:section>
+
+      <!-- TTS -->
+      <html:section class="lk-page" data-lk-page-panel="tts-basic" data-title="TTS 配置 · 基本设置">
+        <html:div class="lk-card"><html:h3>发音渠道</html:h3><html:div class="lk-grid two"><html:label class="lk-field"><html:span>单词发音渠道</html:span><html:select data-lk-key="wordTTSProvider"><html:option value="local">系统本地 TTS</html:option><html:option value="edge">Edge TTS</html:option><html:option value="gpt">GPT TTS</html:option><html:option value="custom">自定义 URL</html:option></html:select></html:label><html:label class="lk-field"><html:span>句子发音渠道</html:span><html:select data-lk-key="sentenceTTSProvider"><html:option value="local">系统本地 TTS</html:option><html:option value="edge">Edge TTS</html:option><html:option value="gpt">GPT TTS</html:option><html:option value="custom">自定义 URL</html:option></html:select></html:label><html:label class="lk-field"><html:span>启用单词 TTS</html:span><html:input type="checkbox" data-lk-key="enableWordTTS"/></html:label><html:label class="lk-field"><html:span>启用句子 TTS</html:span><html:input type="checkbox" data-lk-key="enableSentenceTTS"/></html:label></html:div></html:div>
+      </html:section>
+      <html:section class="lk-page" data-lk-page-panel="tts-local" data-title="TTS 配置 · 本地 TTS">
+        <html:div class="lk-card"><html:h3>系统语音</html:h3><html:label class="lk-field"><html:span>默认语音名称（留空自动选择）</html:span><html:input type="text" data-lk-key="localTTSVoice"/></html:label><html:div class="lk-grid two"><html:label class="lk-field"><html:span>语速</html:span><html:input type="range" min="0.1" max="2" step="0.1" data-lk-key="localTTSRate" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>音调</html:span><html:input type="range" min="0.1" max="2" step="0.1" data-lk-key="localTTSPitch" data-lk-type="number"/></html:label></html:div><html:div class="lk-button-row"><html:button type="button" class="lk-button" data-lk-action="test-local-tts">测试本地 TTS</html:button></html:div></html:div>
+      </html:section>
+      <html:section class="lk-page" data-lk-page-panel="tts-edge" data-title="TTS 配置 · Edge TTS">
+        <html:div class="lk-card"><html:h3>Edge TTS</html:h3><html:label class="lk-field"><html:span>自动根据语言选择声音</html:span><html:input type="checkbox" data-lk-key="edgeTTSAutoVoice"/></html:label><html:label class="lk-field"><html:span>声音名称</html:span><html:input type="text" data-lk-key="edgeTTSVoice" placeholder="zh-CN-XiaoxiaoNeural"/></html:label><html:div class="lk-grid three"><html:label class="lk-field"><html:span>语速</html:span><html:input type="range" min="-100" max="100" step="5" data-lk-key="edgeTTSRate" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>音量</html:span><html:input type="range" min="-100" max="100" step="5" data-lk-key="edgeTTSVolume" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>音调</html:span><html:input type="range" min="-50" max="50" step="5" data-lk-key="edgeTTSPitch" data-lk-type="number"/></html:label></html:div></html:div>
+      </html:section>
+      <html:section class="lk-page" data-lk-page-panel="tts-gpt" data-title="TTS 配置 · GPT TTS">
+        <html:div class="lk-card"><html:h3>GPT-compatible TTS</html:h3><html:div class="lk-grid two"><html:label class="lk-field full"><html:span>Base URL</html:span><html:input type="text" data-lk-key="gptTTSBaseURL"/></html:label><html:label class="lk-field full"><html:span>API Key</html:span><html:input type="password" data-lk-key="gptTTSApiKey"/></html:label><html:label class="lk-field"><html:span>模型</html:span><html:input type="text" data-lk-key="gptTTSModel" placeholder="gpt-4o-mini-tts"/></html:label><html:label class="lk-field"><html:span>Voice</html:span><html:input type="text" data-lk-key="gptTTSVoice" placeholder="alloy"/></html:label><html:label class="lk-field"><html:span>输出格式</html:span><html:select data-lk-key="gptTTSResponseFormat"><html:option value="mp3">MP3</html:option><html:option value="wav">WAV</html:option><html:option value="opus">OPUS</html:option></html:select></html:label><html:label class="lk-field"><html:span>语速</html:span><html:input type="number" min="0.25" max="4" step="0.05" data-lk-key="gptTTSSpeed" data-lk-type="number"/></html:label></html:div><html:label class="lk-field"><html:span>Instructions</html:span><html:textarea class="lk-textarea" data-lk-key="gptTTSInstructions"></html:textarea></html:label></html:div>
+      </html:section>
+      <html:section class="lk-page" data-lk-page-panel="tts-custom" data-title="TTS 配置 · 自定义 URL">
+        <html:div class="lk-card"><html:h3>自定义语音 URL 模板</html:h3><html:p class="lk-muted">支持变量 {word} 与 {lang}。点击发音时插件会替换变量并请求该 URL。</html:p><html:label class="lk-field"><html:span>URL 模板 1</html:span><html:textarea class="lk-textarea" data-lk-key="wordAudioUrlTemplate"></html:textarea></html:label><html:label class="lk-field"><html:span>URL 模板 2</html:span><html:textarea class="lk-textarea" data-lk-key="wordAudioUrlTemplate2"></html:textarea></html:label></html:div>
+      </html:section>
+
+      <!-- Popup -->
+      <html:section class="lk-page" data-lk-page-panel="popup-layout" data-title="弹窗设置 · 弹窗行为">
+        <html:div class="lk-card"><html:h3>单词弹窗行为</html:h3><html:div class="lk-grid two"><html:label class="lk-field"><html:span>仅点击时打开</html:span><html:input type="checkbox" data-lk-key="clickOnlyTooltip"/></html:label><html:label class="lk-field"><html:span>自动展开弹窗</html:span><html:input type="checkbox" data-lk-key="autoExpandTooltip"/></html:label><html:label class="lk-field"><html:span>自动关闭弹窗</html:span><html:input type="checkbox" data-lk-key="autoCloseTooltip"/></html:label><html:label class="lk-field"><html:span>自动刷新弹窗</html:span><html:input type="checkbox" data-lk-key="autoRefreshTooltip"/></html:label><html:label class="lk-field"><html:span>优先显示在单词上方</html:span><html:input type="checkbox" data-lk-key="preferPopupAbove"/></html:label><html:label class="lk-field"><html:span>选择文本时优先向下</html:span><html:input type="checkbox" data-lk-key="selectionPopupPreferDown"/></html:label><html:label class="lk-field"><html:span>单词弹窗间距</html:span><html:input type="number" min="0" max="100" data-lk-key="tooltipGap" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>选区弹窗间距</html:span><html:input type="number" min="0" max="100" data-lk-key="selectionPopupGap" data-lk-type="number"/></html:label></html:div><html:div class="lk-button-row"><html:button type="button" class="lk-button" data-lk-action="reset-minimized">清除缩小状态</html:button><html:button type="button" class="lk-button primary" data-lk-action="apply-now">重新载入当前阅读器</html:button></html:div></html:div>
+        <html:div class="lk-card"><html:h3>整句翻译面板</html:h3><html:div class="lk-grid two"><html:label class="lk-field"><html:span>触发模式</html:span><html:select data-lk-key="wordExplosionTriggerMode"><html:option value="click">点击</html:option><html:option value="hover">悬停</html:option></html:select></html:label><html:label class="lk-field"><html:span>位置模式</html:span><html:select data-lk-key="wordExplosionPositionMode"><html:option value="auto">自动</html:option><html:option value="manual">手动</html:option></html:select></html:label><html:label class="lk-field"><html:span>字号</html:span><html:input type="number" min="10" max="28" data-lk-key="wordExplosionFontSize" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>最大宽度</html:span><html:input type="number" min="320" max="1400" data-lk-key="wordExplosionMaxWidth" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>单词排列</html:span><html:select data-lk-key="wordExplosionWordsLayout"><html:option value="single-column">单列</html:option><html:option value="double-column">双列</html:option><html:option value="triple-column">三列</html:option></html:select></html:label><html:label class="lk-field"><html:span>每词释义数</html:span><html:select data-lk-key="wordExplosionTranslationCount"><html:option value="1">1</html:option><html:option value="2">2</html:option><html:option value="3">3</html:option><html:option value="all">全部</html:option></html:select></html:label><html:label class="lk-field"><html:span>整句翻译数量</html:span><html:select data-lk-key="explosionSentenceTranslationCount" data-lk-type="number"><html:option value="1">1</html:option><html:option value="2">2</html:option></html:select></html:label><html:label class="lk-field"><html:span>优先向上</html:span><html:input type="checkbox" data-lk-key="wordExplosionPreferUp"/></html:label><html:label class="lk-field"><html:span>高亮当前句子</html:span><html:input type="checkbox" data-lk-key="wordExplosionHighlightSentence"/></html:label><html:label class="lk-field"><html:span>句子高亮颜色</html:span><html:input type="text" data-lk-key="wordExplosionHighlightColor"/></html:label></html:div></html:div>
+      </html:section>
+
+      <html:section class="lk-page" data-lk-page-panel="background" data-title="弹窗设置 · 背景设置">
+        <html:div class="lk-card"><html:h3>弹窗外观</html:h3><html:div class="lk-grid two"><html:label class="lk-field"><html:span>弹窗主题</html:span><html:select data-lk-key="tooltipThemeMode"><html:option value="auto">自动</html:option><html:option value="light">浅色</html:option><html:option value="dark">深色</html:option></html:select></html:label><html:label class="lk-field"><html:span>图案背景</html:span><html:input type="checkbox" data-lk-special="tooltipBackgroundEnabled"/></html:label><html:label class="lk-field"><html:span>液态玻璃效果</html:span><html:input type="checkbox" data-lk-key="liquidGlassEnabled"/></html:label><html:label class="lk-field"><html:span>分析窗口玻璃效果</html:span><html:input type="checkbox" data-lk-key="analysisGlassEnabled"/></html:label><html:label class="lk-field"><html:span>设备像素缩放</html:span><html:input type="number" min="0.5" max="2.5" step="0.05" data-lk-key="devicePixelRatio" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>玻璃类型</html:span><html:select data-lk-key="glassEffectType"><html:option value="none">无</html:option><html:option value="rough">磨砂</html:option><html:option value="liquid">液态（Zotero 中使用兼容玻璃）</html:option></html:select></html:label></html:div><html:p class="lk-hint">Zotero 基于 Gecko，无法渲染 Chromium 的 SVG 液态扭曲滤镜；启用后会使用可读性更稳定的兼容毛玻璃效果。</html:p></html:div>
+      </html:section>
+
+      <html:section class="lk-page" data-lk-page-panel="capsules" data-title="弹窗设置 · 自定义胶囊">
+        <html:div class="lk-card"><html:h3>自定义搜索胶囊</html:h3><html:p class="lk-muted">使用 JSON 编辑原版 customCapsules 配置。URL 中可使用 {word} 和 {sentence}。</html:p><html:textarea id="lk-custom-capsules" class="lk-textarea prompt" data-lk-key="customCapsules" data-lk-type="json" placeholder='[{"name":"Google","url":"https://www.google.com/search?q={word}"}]'></html:textarea><html:div class="lk-button-row"><html:button type="button" class="lk-button" data-lk-action="format-capsules">格式化 JSON</html:button><html:button type="button" class="lk-button" data-lk-action="clear-setting" data-key="customCapsules">恢复默认</html:button></html:div></html:div>
+      </html:section>
+
+      <!-- EPUB -->
+      <html:section class="lk-page" data-lk-page-panel="epub" data-title="EPUB 文本修复">
+        <html:div class="lk-card"><html:h3>EPUB 阅读适配</html:h3><html:p>浏览器版的 EPUB 拆分、Telegra.ph 上传和罗马注音清理是独立文件转换工具。Zotero 插件不会在设置窗口内改写你的原始电子书文件。</html:p><html:div class="lk-setting-row"><html:div><html:strong>自动清理 EPUB 文本中的软连字符</html:strong><html:span>只影响 LingKuma 在 Zotero 阅读器中获取的文本，不修改附件文件。</html:span></html:div><html:label class="lk-switch"><html:input type="checkbox" data-lk-key="epubSoftHyphenCleanup"/><html:span></html:span></html:label></html:div><html:div class="lk-setting-row"><html:div><html:strong>合并断行单词</html:strong><html:span>尝试把分页或断行造成的英文连字符重新连接。</html:span></html:div><html:label class="lk-switch"><html:input type="checkbox" data-lk-key="epubHyphenRepair"/><html:span></html:span></html:label></html:div><html:div class="lk-note">需要转换 EPUB 文件时，仍建议使用 LingKuma 原仓库中的独立工具或 Calibre。这里的设置仅作用于 Zotero 阅读器中的语言学习识别。</html:div></html:div>
+      </html:section>
+
+      <!-- About -->
+      <html:section class="lk-page" data-lk-page-panel="about" data-title="关于">
+        <html:div class="lk-card"><html:h2>LingKuma for Zotero 1.0.1</html:h2><html:p>这是基于 LingKuma 1.1.0 源代码的非官方 Zotero 适配版。语言学习、高亮、AI 释义、整句翻译和弹窗逻辑来自 LingKuma；当前页面是直接嵌入 Zotero 设置窗口的原生设置面板，不再加载 iframe 或跳转浏览器网页。</html:p><html:div class="lk-button-row"><html:button type="button" class="lk-button primary" data-lk-action="open-upstream">打开 LingKuma GitHub</html:button><html:button type="button" class="lk-button" data-lk-action="diagnostic">运行诊断</html:button><html:button type="button" class="lk-button danger" data-lk-action="reset-settings">恢复默认设置</html:button></html:div><html:div class="lk-note">恢复默认设置不会删除词库、熟悉度、释义或例句。</html:div></html:div>
+      </html:section>
+    </html:main>
+  </html:div>
+</vbox>

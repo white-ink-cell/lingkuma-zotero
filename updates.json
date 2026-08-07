@@ -1,0 +1,19 @@
+{
+  "addons": {
+    "lingkuma-zotero@white-ink-cell": {
+      "updates": [
+        {
+          "version": "1.0.1",
+          "update_link": "https://github.com/white-ink-cell/lingkuma-zotero/releases/download/v1.0.1/lingkuma-zotero-1.0.1.xpi",
+          "update_hash": "sha256:b4160813705e88c53c22aaffd95ca0f9e07465f9f6a79b1413c48012b86e2972",
+          "applications": {
+            "zotero": {
+              "strict_min_version": "9.0",
+              "strict_max_version": "9.0.*"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
