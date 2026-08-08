@@ -2,6 +2,11 @@
 
 [English](README.md) | [简体中文](README_zh.md) | [日本語](README_ja.md) | [한국어](README_ko.md)
 
+## Other Port
+
+- [LingKuma for Calibre](https://github.com/white-ink-cell/lingkuma-calibre)
+- [LingKuma](https://github.com/lingkuma/LingKuma)
+
 **See it. Click it. Learn it.**
 
 LingKuma — *let knowledge spread beyond the barriers of language* — is a translation and language-learning tool designed around reading.
@@ -98,8 +103,3 @@ See [`UPSTREAM.md`](UPSTREAM.md) for details.
 ## License
 
 The original LingKuma authorship, copyright, and license remain unchanged. The Zotero adapter / compatibility layer is covered by [`LICENSE-ADAPTER.txt`](LICENSE-ADAPTER.txt). Upstream LingKuma licensing is preserved in [`LICENSE-LINGKUMA.txt`](LICENSE-LINGKUMA.txt), and bundled third-party notices are in [`THIRD-PARTY-NOTICES.txt`](THIRD-PARTY-NOTICES.txt).
-
-## Other Port
-
-- [LingKuma for Calibre](https://github.com/white-ink-cell/lingkuma-calibre)
-- [LingKuma](https://github.com/lingkuma/LingKuma)
