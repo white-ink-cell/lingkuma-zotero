@@ -2,6 +2,30 @@
 
 [English](README.md) | [简体中文](README_zh.md) | [日本語](README_ja.md) | [한국어](README_ko.md)
 
+**See it. Click it. Learn it.**
+
+LingKuma — *let knowledge spread beyond the barriers of language* — is a translation and language-learning tool designed around reading.
+
+You shouldn't have to wait until you have "learned" a language before you can start reading papers, books, and documents in that language.
+
+When you encounter a word you don't know, **click it**.  
+When a sentence is difficult to understand, **click it**.
+
+LingKuma helps you read content in languages you are still learning while naturally expanding your vocabulary, becoming more familiar with grammar and expressions, and improving your understanding of the language.
+
+> **Enjoy reading first — and learn a new language along the way.**
+
+## What can LingKuma do?
+
+- Click a word to see its meaning
+- Translate and analyze complete sentences
+- Listen to word pronunciation with TTS
+- Learn vocabulary while reading
+- Get AI-assisted grammar and contextual explanations
+- Translate between multiple languages
+- Use light and dark themes
+- Keep the original LingKuma-style interface inside Zotero
+
 An unofficial Zotero desktop port of **LingKuma 1.1.0**. It brings LingKuma's highlighting, word lookup, translation / AI, sentence analysis, vocabulary, TTS, and light/dark themes into Zotero's PDF and EPUB reading environment.
 
 > **Zotero port published / maintained by [`white-ink-cell`](https://github.com/white-ink-cell)**  
