@@ -32,7 +32,11 @@ LingKuma 帮助你阅读仍在学习中的语言内容，让你在阅读过程�
 
 亮色主题，英文 → 中文翻译：
 
+<img src="docs/images/zotero-light-chinese.png" alt="LingKuma for Zotero light theme with Chinese translation" width="900">
+
 暗色主题，英文 → 俄文翻译：
+
+<img src="docs/images/zotero-dark-russian.png" alt="LingKuma for Zotero dark theme with Russian translation" width="900">
 
 ## Zotero 移植版
 
