@@ -1,0 +1,13 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Temporary / build files
+*.log
+*.tmp
+*.bak
+*.xpi
+*.zip
+__pycache__/

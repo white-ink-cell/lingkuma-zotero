@@ -25,6 +25,7 @@ let wordExplosionManualBlacklistOverride = false; //增加本页手动黑名单�
 let isPluginEnabled = false; // 插件总开关状态（默认为true，等待异步检查完成后更新）
 let wordExplosionControlMessageSeen = false;
 let wordExplosionInitialized = false;
+let wordExplosionRenderSequence = 0; // 用于忽略过期的异步解析结果
 let currentExplosionSentenceRange = null; // 当前爆炸句子的Range对象，用于高亮
 let explosionThemeMode = 'auto'; // 主题模式：'auto', 'light', 'dark'（跟随tooltip的tooltipThemeMode）
 let currentExplosionPosition = null; // 记录当前弹窗的定位信息：{ isAbove: boolean, sentenceRect: DOMRect }
@@ -578,12 +579,14 @@ function createWordExplosionTooltip() {
     explosionShadowRoot.appendChild(container);
     // 将左侧按钮单独添加到Shadow DOM，而不是作为container的子元素
     leftButtons.id = 'word-explosion-left-buttons-wrapper';
+    leftButtons.style.visibility = 'hidden';
     explosionShadowRoot.appendChild(leftButtons);
 
     // 创建透明连接层，填充按钮和弹窗之间的空隙，阻止鼠标穿透
     const leftButtonsBridge = document.createElement('div');
     leftButtonsBridge.id = 'word-explosion-left-buttons-bridge';
     leftButtonsBridge.className = 'word-explosion-left-buttons-bridge';
+    leftButtonsBridge.style.visibility = 'hidden';
     // 添加鼠标事件，确保被认为在弹窗内
     leftButtonsBridge.addEventListener('mouseenter', () => {
       isMouseInsideExplosion = true;
@@ -673,7 +676,12 @@ function startDragWordExplosion(e) {
 function dragWordExplosion(e) {
   if (!wordExplosionDragging) return;
 
-  const x = e.clientX - wordExplosionDragOffset.x;
+  const rect = wordExplosionEl.getBoundingClientRect();
+  const x = clampWordExplosionLeft(
+    e.clientX - wordExplosionDragOffset.x,
+    rect.width,
+    window.innerWidth
+  );
   const y = e.clientY - wordExplosionDragOffset.y;
 
   wordExplosionEl.style.left = x + 'px';
@@ -699,9 +707,25 @@ function stopDragWordExplosion() {
   document.removeEventListener('mouseup', stopDragWordExplosion);
 }
 
+// The auxiliary buttons live beside the popup, so hide them during the
+// off-screen measurement phase as well as when the popup itself is hidden.
+function setExplosionAuxiliaryVisibility(visible) {
+  if (!explosionShadowRoot) return;
+
+  const leftButtons = explosionShadowRoot.getElementById('word-explosion-left-buttons-wrapper');
+  const leftButtonsBridge = explosionShadowRoot.getElementById('word-explosion-left-buttons-bridge');
+  if (leftButtons) {
+    leftButtons.style.visibility = visible ? 'visible' : 'hidden';
+  }
+  if (leftButtonsBridge) {
+    leftButtonsBridge.style.visibility = visible ? 'visible' : 'hidden';
+  }
+}
+
 function hideWordExplosion() {
   if (wordExplosionEl) {
     wordExplosionEl.style.display = 'none';
+    wordExplosionEl.style.visibility = 'hidden';
   }
 
   // 从Shadow DOM中隐藏左侧按钮
@@ -709,12 +733,14 @@ function hideWordExplosion() {
     const leftButtons = explosionShadowRoot.getElementById('word-explosion-left-buttons-wrapper');
     if (leftButtons) {
       leftButtons.style.display = 'none';
+      leftButtons.style.visibility = 'hidden';
     }
 
     // 隐藏透明连接层
     const leftButtonsBridge = explosionShadowRoot.getElementById('word-explosion-left-buttons-bridge');
     if (leftButtonsBridge) {
       leftButtonsBridge.style.display = 'none';
+      leftButtonsBridge.style.visibility = 'hidden';
     }
   }
 
@@ -1462,6 +1488,12 @@ function showWordExplosion(sentence, sentenceRect = null, sentenceInfo = null) {
     return;
   }
 
+  // 在异步解析生词前立即隐藏旧弹窗，避免旧位置或默认位置短暂闪现。
+  const renderSequence = ++wordExplosionRenderSequence;
+  if (wordExplosionEl) {
+    hideWordExplosion();
+  }
+
   // 切换句子时，移除旧的高亮
   if (currentExplosionSentence !== sentence) {
     removeExplosionSentenceHighlight();
@@ -1526,12 +1558,16 @@ function showWordExplosion(sentence, sentenceRect = null, sentenceInfo = null) {
 
   // 解析句子，获取未知单词
   extractUnknownWords(sentence).then(async unknownWords => {
+    // 新句子已经触发时，丢弃旧请求的结果，避免它重新显示弹窗。
+    if (renderSequence !== wordExplosionRenderSequence) return;
+
     // 创建或获取弹窗（无论是否有生词都创建，以支持爆炸优先模式）
     const tooltip = createWordExplosionTooltip();
 
     if (unknownWords.length === 0) {
       // 没有未知单词，检查是否显示动效
       const result = await getA7StorageValues(['showKnownSentenceAnimation']);
+      if (renderSequence !== wordExplosionRenderSequence) return;
       const showAnimation = result.showKnownSentenceAnimation !== undefined ? result.showKnownSentenceAnimation : true;
 
       if (showAnimation) {
@@ -1557,6 +1593,7 @@ function showWordExplosion(sentence, sentenceRect = null, sentenceInfo = null) {
     // 先将弹窗移到屏幕外，避免在定位前闪现
     tooltip.style.left = '-9999px';
     tooltip.style.top = '-9999px';
+    setExplosionAuxiliaryVisibility(false);
 
     // 先隐藏弹窗，让浏览器完成内容渲染和布局，但不显示给用户
     tooltip.style.visibility = 'hidden';
@@ -1570,9 +1607,12 @@ function showWordExplosion(sentence, sentenceRect = null, sentenceInfo = null) {
 
     // 使用requestAnimationFrame确保浏览器已完成渲染，再进行精确定位
     requestAnimationFrame(async () => {
+      if (renderSequence !== wordExplosionRenderSequence) return;
       await positionWordExplosion(sentenceRect);
+      if (renderSequence !== wordExplosionRenderSequence) return;
       // 定位完成后才显示弹窗，避免在屏幕左侧闪现
       tooltip.style.visibility = 'visible';
+      setExplosionAuxiliaryVisibility(true);
     });
   });
 }
@@ -1651,6 +1691,15 @@ function getStorageValue(key) {
   return getA7StorageValues([key]).then((result) => result[key]);
 }
 
+// Keep the popup inside the viewport while preserving a small visual margin.
+// `left` is always expressed in viewport coordinates by this helper.
+function clampWordExplosionLeft(left, width, viewportWidth = window.innerWidth, margin = 20) {
+  const safeLeft = Number.isFinite(left) ? left : margin;
+  const safeWidth = Number.isFinite(width) ? Math.max(0, width) : 0;
+  const maxLeft = Math.max(margin, viewportWidth - safeWidth - margin);
+  return Math.min(Math.max(safeLeft, margin), maxLeft);
+}
+
 // 定位弹窗 - 智能上下定位模式
 async function positionWordExplosion(sentenceRect = null) {
   if (!wordExplosionEl) return;
@@ -1673,8 +1722,14 @@ async function positionWordExplosion(sentenceRect = null) {
   if (wordExplosionConfig.positionMode === 'manual' && wordExplosionSavedPosition) {
     wordExplosionEl.style.position = 'fixed';
 
-    // 手动模式使用保存的位置
-    wordExplosionEl.style.left = wordExplosionSavedPosition.x + 'px';
+    // 手动模式使用保存的位置，但窗口尺寸或视口变化后仍需保持在屏幕内。
+    const savedRect = wordExplosionEl.getBoundingClientRect();
+    const manualLeft = clampWordExplosionLeft(
+      wordExplosionSavedPosition.x,
+      savedRect.width,
+      window.innerWidth
+    );
+    wordExplosionEl.style.left = manualLeft + 'px';
     wordExplosionEl.style.top = wordExplosionSavedPosition.y + 'px';
 
     // 手动模式下也需要定位左侧按钮
@@ -1692,15 +1747,15 @@ async function positionWordExplosion(sentenceRect = null) {
         }
         // 手动模式使用fixed定位
         leftButtons.style.position = 'fixed';
-        leftButtons.style.left = (wordExplosionSavedPosition.x - 28) + 'px';
-        leftButtons.style.top = (wordExplosionSavedPosition.y + 16) + 'px';
+        leftButtons.style.left = (manualLeft - 28) + 'px';
+        leftButtons.style.top = (parseFloat(wordExplosionEl.style.top) + 16) + 'px';
 
         // 定位透明连接层
         if (leftButtonsBridge) {
           leftButtonsBridge.style.display = 'block';
           leftButtonsBridge.style.position = 'fixed';
-          leftButtonsBridge.style.left = (wordExplosionSavedPosition.x - 4) + 'px';
-          leftButtonsBridge.style.top = wordExplosionSavedPosition.y + 'px';
+          leftButtonsBridge.style.left = (manualLeft - 4) + 'px';
+          leftButtonsBridge.style.top = wordExplosionEl.style.top;
           // 获取弹窗高度
           const explosionRect = wordExplosionEl.getBoundingClientRect();
           leftButtonsBridge.style.height = explosionRect.height + 'px';
@@ -1751,10 +1806,14 @@ async function positionWordExplosion(sentenceRect = null) {
 
   // 如果没有句子位置信息，使用固定位置（右下角）
   if (!sentenceRect) {
-    const x = viewportWidth - explosionWidth - 20 + scrollX;
+    const x = clampWordExplosionLeft(
+      viewportWidth - explosionWidth - 20,
+      explosionWidth,
+      viewportWidth
+    ) + scrollX;
     const y = viewportHeight - 620 + scrollY;
 
-    wordExplosionEl.style.left = Math.max(20 + scrollX, x) + 'px';
+    wordExplosionEl.style.left = x + 'px';
     wordExplosionEl.style.top = Math.max(20 + scrollY, y) + 'px';
     wordExplosionEl.style.bottom = 'auto';
     wordExplosionEl.style.maxHeight = '600px';
@@ -1779,16 +1838,7 @@ async function positionWordExplosion(sentenceRect = null) {
   // console.log('[WordExplosion] 居中计算 step5 - 初始弹窗左边缘:', explosionLeft, '(句子中心:', sentenceCenterX, '- 半宽:', halfExplosionWidth, ')');
 
   // 确保不超出左右边界（视口坐标）
-  const originalLeft = explosionLeft;
-  if (explosionLeft < 20) {
-    explosionLeft = 20;
-  } else if (explosionLeft + explosionWidth > viewportWidth - 20) {
-    explosionLeft = viewportWidth - explosionWidth - 20;
-  }
-
-  if (originalLeft !== explosionLeft) {
-    // console.log('[WordExplosion] 居中计算 step6 - 边界调整后的弹窗左边缘:', explosionLeft);
-  }
+  explosionLeft = clampWordExplosionLeft(explosionLeft, explosionWidth, viewportWidth);
 
   // 转换为页面坐标（加上滚动偏移）
   const explosionLeftInViewport = explosionLeft;
@@ -1889,11 +1939,11 @@ async function positionWordExplosion(sentenceRect = null) {
 
     // 计算期望的底部中心点位置（页面坐标）
     // 底部中心点应该在句子上方 gap 距离处
-    const bottomCenterX = sentenceCenterX + scrollX;
     const bottomCenterY = explosionBottomInPage;
 
     // 先设置 maxHeight 和临时的 left，以便获取实际高度
-    wordExplosionEl.style.left = (bottomCenterX - explosionWidth / 2) + 'px';
+    // 使用已经过视口边界约束的水平位置，避免短句把宽弹窗推到屏幕外。
+    wordExplosionEl.style.left = explosionLeft + 'px';
     wordExplosionEl.style.maxHeight = finalMaxHeight + 'px';
     wordExplosionEl.style.overflow = 'auto';
     wordExplosionEl.style.bottom = 'auto';
@@ -1903,7 +1953,7 @@ async function positionWordExplosion(sentenceRect = null) {
     const actualHeight = wordExplosionEl.getBoundingClientRect().height;
 
     // 向上弹出时，计算top使得底部在期望位置
-    // 期望的左下角位置 = (bottomCenterX - width/2, bottomCenterY)
+    // 期望的左下角位置 = (explosionLeft, bottomCenterY)
     // 所以 top = bottomCenterY - actualHeight
     const adjustedTop = bottomCenterY - actualHeight;
 
@@ -1935,12 +1985,10 @@ async function positionWordExplosion(sentenceRect = null) {
     const explosionTop = sentenceRect.bottom + gap + scrollY;
 
     // 向下弹出时，计算left和top使得弹窗居中对齐句子
-    const topCenterX = sentenceCenterX + scrollX;
     const topCenterY = explosionTop;
 
-    const adjustedLeft = topCenterX - (explosionWidth / 2);
-
-    wordExplosionEl.style.left = adjustedLeft + 'px';
+    // 向下弹出也复用同一个边界内的水平位置。
+    wordExplosionEl.style.left = explosionLeft + 'px';
     wordExplosionEl.style.top = topCenterY + 'px';
     wordExplosionEl.style.bottom = 'auto';
     wordExplosionEl.style.maxHeight = maxHeight + 'px';
@@ -1998,7 +2046,24 @@ function repositionExplosionWhenAbove() {
   const { explosionBottomInPage, minTopInPage } = currentExplosionPosition;
 
   // 获取弹窗当前的实际高度
-  const currentHeight = wordExplosionEl.getBoundingClientRect().height;
+  const currentRect = wordExplosionEl.getBoundingClientRect();
+  const currentHeight = currentRect.height;
+
+  // 内容更新可能改变弹窗宽度，重新定位时也要重新应用水平边界。
+  const scrollX = currentExplosionPosition.scrollX || 0;
+  const currentLeft = parseFloat(wordExplosionEl.style.left);
+  const currentLeftInViewport = wordExplosionEl.style.position === 'fixed'
+    ? currentLeft
+    : currentLeft - scrollX;
+  const clampedLeftInViewport = clampWordExplosionLeft(
+    currentLeftInViewport,
+    currentRect.width,
+    window.innerWidth
+  );
+  const clampedLeft = wordExplosionEl.style.position === 'fixed'
+    ? clampedLeftInViewport
+    : clampedLeftInViewport + scrollX;
+  wordExplosionEl.style.left = clampedLeft + 'px';
 
   // 计算新的top位置，使底部保持在explosionBottomInPage
   const newTop = explosionBottomInPage - currentHeight;
@@ -2015,10 +2080,12 @@ function repositionExplosionWhenAbove() {
     const leftButtonsBridge = explosionShadowRoot.getElementById('word-explosion-left-buttons-bridge');
 
     if (leftButtons) {
+      leftButtons.style.left = (clampedLeft - 28) + 'px';
       leftButtons.style.top = (finalTop + 16) + 'px'; // 向下偏移16px，避免与弹窗圆角平齐
     }
 
     if (leftButtonsBridge) {
+      leftButtonsBridge.style.left = (clampedLeft - 4) + 'px';
       leftButtonsBridge.style.top = finalTop + 'px';
       // 更新连接层高度
       leftButtonsBridge.style.height = currentHeight + 'px';
@@ -4421,12 +4488,16 @@ function findWordAndSentenceAtPosition(x, y) {
           });
           console.log('[WordExplosion] getSentenceForWord 返回:', sentence);
 
-          if (sentence) {
+          // Overlay subtitle items can be a single sentence without terminal
+          // punctuation; content.js may therefore return an empty boundary.
+          // Use the owning text node as the sentence in that case.
+          const resolvedSentence = sentence || textNode.textContent?.trim();
+          if (resolvedSentence) {
             console.log('[WordExplosion] 成功找到句子和单词:', { word: foundWord.word, sentence: sentence.substring(0, 50) + '...' });
             return {
               word: foundWord.word,
               wordLower: foundWord.wordLower,
-              sentence: sentence,
+              sentence: resolvedSentence,
               rect: foundWord.rect,
               textNode: textNode,
               range: foundWord.range,

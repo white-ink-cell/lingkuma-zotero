@@ -30,7 +30,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ---
 [miseya/kuromoji.js: JavaScript implementation of Japanese morphological analyzer. With types and browser support.](https://github.com/miseya/kuromoji.js)
 
-src\service\jp\LICENSE-2.0.txt
+licenses/KUROMOJI-APACHE-2.0.txt
 src\service\jp\kuromoji.js
 
 
@@ -486,6 +486,19 @@ Changes:
 - Bundled static.extrasmall.js and its dependencies into one browser global file.
 
 - Exposed the detector as globalThis.eld for use in a plain JavaScript browser extension.
+
+---
+
+## English Wiktionary dictionary data
+
+Generated English-to-Simplified-Chinese dictionary data is derived and
+modified from English Wiktionary contributor data extracted through
+Wiktextract and distributed by Kaikki.org.
+
+License: CC BY-SA 4.0
+Source: https://kaikki.org/dictionary/raw-wiktextract-data.jsonl.gz
+Attribution and modification notice:
+licenses/ENGLISH-WIKTIONARY-DATA-NOTICE.txt
 
 
 

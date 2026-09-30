@@ -1,0 +1,41 @@
+English Wiktionary dictionary data notice
+=========================================
+
+The generated LingKuma English-to-Simplified-Chinese dictionary is derived
+and modified from English Wiktionary contributor data extracted through
+Wiktextract and distributed by Kaikki.org.
+
+Source: https://kaikki.org/dictionary/raw-wiktextract-data.jsonl.gz
+Source project: https://en.wiktionary.org/
+Extraction project: https://github.com/tatuylonen/wiktextract
+Snapshot declaration: English Wiktionary dump dated 2026-09-02
+Retrieved: 2026-09-29
+Raw gzip re-verified: 2026-09-30
+Raw file SHA-256:
+504d55e7053c742ffe24b49a6ebd0c8261a1cd4b352702a1940547088829f5e1
+
+Kaikki reissued the gzip bytes for the same declared 2026-09-02 source dump.
+Rebuilding with the pre-pronunciation-preservation builder produced an entries
+table exactly equal in both SQL EXCEPT directions to the original asset's
+83,535 rows; only raw-gzip SHA/size metadata differed.
+
+Dictionary text data is provided under Creative Commons
+Attribution-ShareAlike 4.0 International (CC BY-SA 4.0):
+https://creativecommons.org/licenses/by-sa/4.0/
+
+Attribution: English Wiktionary contributors. An entry's contributor history
+is available from its English Wiktionary page and history, for example:
+https://en.wiktionary.org/wiki/book
+
+LingKuma modifications: select English entries with Mandarin/Chinese
+translations, preserve exact-surface English pronunciation-only records,
+normalize translations to Simplified Chinese with OpenCC t2s, filter malformed
+target-language records, deduplicate values, retain bounded
+lexical/POS/form/pronunciation data, and convert the result to the LingKuma
+SQLite schema. The derived dictionary is distributed under CC BY-SA 4.0. No
+English Wiktionary or Kaikki endorsement is implied.
+
+Wikimedia audio files are not bundled in the dictionary. Pronunciation records
+contain HTTPS Wikimedia Commons URLs and per-file Commons source-page URLs.
+Each remote media file remains subject to the author and license shown on its
+own Commons file page.

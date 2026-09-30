@@ -2,7 +2,7 @@
 
 [English](UPSTREAM.md) | [简体中文](UPSTREAM_zh.md) | [日本語](UPSTREAM_ja.md) | [한국어](UPSTREAM_ko.md)
 
-This project is an unofficial Zotero port of **LingKuma 1.1.0**.
+This project is an unofficial Zotero port of **LingKuma 1.1.1**.
 
 - Original project: `lingkuma/LingKuma`
 - Zotero port maintained / published by: `white-ink-cell`

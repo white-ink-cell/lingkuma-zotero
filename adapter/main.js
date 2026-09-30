@@ -10,23 +10,27 @@ const LK_INITIAL_CONTENT_SCRIPTS = Object.freeze([
   // Keep the exact order from LingKuma's browser manifest.
   "src/utils/highlight_floating_button.js",
   "src/service/a1_loadKnowWords.js",
+  "src/service/jp/kuromoji.js",
   "src/service/a2_hightlight.js"
 ]);
 
 const LK_RUNTIME_SCRIPTS = Object.freeze([
   // Zotero reader adaptation: keep LingKuma's original PDF/EPUB learning UI
   // and language-learning logic, but do not load browser account/subscription,
-  // YouTube, mascot, ruler or other normal-web-page-only modules.
+  // YouTube, mascot or other normal-web-page-only modules.
   "src/utils/lingqBlocker.js",
   "src/utils/cloudAPI.js",
   "src/utils/dataAccessLayer.js",
   "src/utils/evaluateExpression.js",
   "src/utils/pdfDetection.js",
   "src/utils/sentenseOoOo.js",
+  "src/plugin/bionic.js",
   "src/utils/liquid-glass.js",
+  "src/plugin/readingRuler.js",
   "src/plugin/min/compromise.js",
   "src/plugin/min/de-compromise.min.js",
   "src/utils/language-detector/eld.extrasmall.global.js",
+  "src/plugin/pos-highlight.js",
   "src/service/a3_aiFragen.js",
   "src/service/a4_tooltip_new.js",
   "src/service/a5_custom_word_selection.js",
@@ -53,6 +57,7 @@ class LingKumaZoteroPlugin {
     this.contentCSS = typeof LK_CONTENT_CSS_TEXT === "string" ? LK_CONTENT_CSS_TEXT : "";
     this.resourceData = (typeof LK_RESOURCE_DATA === "object" && LK_RESOURCE_DATA) ? LK_RESOURCE_DATA : {};
     this.state = new LingKumaStateAdapter({ pluginID: id, version });
+    this.lookup = new LingKumaLookupService({ state: this.state, rootURI });
     this.host = new LingKumaMessageHost({ state: this.state, plugin: this, rootURI, pluginID: id });
     this.readerHandlers = [];
     this.windowMenus = new Map();
@@ -61,6 +66,9 @@ class LingKumaZoteroPlugin {
     this.nextReaderTabID = 1000;
     this.scanTimers = new Map();
     this.started = false;
+    this._startPromise = null;
+    this._stopPromise = null;
+    this._lifecycleGeneration = 0;
     this.audioElement = null;
     this.speechUtterance = null;
     this.lastDiagnostic = "尚未扫描阅读器";
@@ -80,35 +88,63 @@ class LingKumaZoteroPlugin {
   }
 
   async start() {
+    if (this.started) return;
+    if (this._startPromise) return this._startPromise;
+    this._stopPromise = null;
+    const generation = ++this._lifecycleGeneration;
+    const pending = this._start(generation);
+    this._startPromise = pending;
+    try { return await pending; }
+    finally { if (this._startPromise === pending) this._startPromise = null; }
+  }
+
+  async _start(generation) {
     await this.state.load();
+    if (generation !== this._lifecycleGeneration) return;
+    await this.lookup.init();
+    if (generation !== this._lifecycleGeneration) {
+      await this.lookup.shutdown();
+      return;
+    }
     this.registerReaderEvents();
     for (const win of Zotero.getMainWindows?.() || []) this.attachMainWindow(win);
     this.started = true;
-    this.debug(`started; build=bridge17-thin-adapter-20260808; upstream LingKuma 1.1.0; words=${Object.keys(this.state.words).length}; resources=${Object.keys(this.resourceData).length}`);
+    this.debug(`started; build=bridge17-thin-adapter-20260808; upstream LingKuma 1.1.1; words=${Object.keys(this.state.words).length}; resources=${Object.keys(this.resourceData).length}`);
     this.scanAllReaders("startup");
   }
 
   async stop() {
+    if (this._stopPromise) return this._stopPromise;
+    this._lifecycleGeneration++;
+    this._stopPromise = this._stop();
+    return this._stopPromise;
+  }
+
+  async _stop() {
     this.started = false;
     for (const [type, handler] of this.readerHandlers) {
       try { Zotero.Reader.unregisterEventListener(type, handler); } catch (_) {}
     }
     this.readerHandlers = [];
     for (const win of Array.from(this.windowMenus.keys())) this.detachMainWindow(win);
-    for (const timer of this.scanTimers.values()) {
+    for (const [reader, timer] of this.scanTimers) {
       try { clearTimeout(timer); } catch (_) {}
+      try { reader.__lingkumaRetryCount = 0; } catch (_) {}
     }
     this.scanTimers.clear();
-    for (const context of Array.from(this.contextsByWindow.values())) {
-      try { context.destroy(); } catch (_) {}
+    for (const reader of Array.from(Zotero.Reader?._readers || [])) {
+      try { reader.__lingkumaRetryCount = 0; } catch (_) {}
     }
-    this.contextsByWindow.clear();
+    for (const win of Array.from(this.contextsByWindow.keys())) this.destroyContextForWindow(win);
     this.stopAudio();
+    try { this.host.destroy?.(); } catch (_) {}
+    await this.lookup.shutdown();
     await this.state.save();
     this.debug("stopped");
   }
 
   onMainWindowLoad(win) {
+    if (!this.started) return;
     this.attachMainWindow(win);
     win.LingKumaZoteroPlugin = this;
     this.scanAllReaders("main-window-load");
@@ -117,6 +153,22 @@ class LingKumaZoteroPlugin {
   onMainWindowUnload(win) {
     try { delete win.LingKumaZoteroPlugin; } catch (_) {}
     this.detachMainWindow(win);
+    for (const contextWindow of Array.from(this.contextsByWindow.keys())) {
+      if (this.belongsToMainWindow(contextWindow, win)) this.destroyContextForWindow(contextWindow);
+    }
+    for (const [reader, timer] of Array.from(this.scanTimers.entries())) {
+      const owned = this.collectReaderWindows(reader).some(candidate => this.belongsToMainWindow(candidate, win));
+      if (!owned) continue;
+      try { clearTimeout(timer); } catch (_) {}
+      this.scanTimers.delete(reader);
+      try { reader.__lingkumaRetryCount = 0; } catch (_) {}
+    }
+  }
+
+  belongsToMainWindow(candidate, mainWindow) {
+    if (!candidate || !mainWindow) return false;
+    try { return candidate === mainWindow || candidate.top === mainWindow; }
+    catch (_) { return false; }
   }
 
   attachMainWindow(win) {
@@ -251,10 +303,7 @@ class LingKumaZoteroPlugin {
     for (const [win, context] of Array.from(this.contextsByWindow.entries())) {
       let alive = false;
       try { alive = !context.destroyed && !!win?.document?.documentElement && !win.closed; } catch (_) {}
-      if (!alive) {
-        try { context.destroy(); } catch (_) {}
-        this.contextsByWindow.delete(win);
-      }
+      if (!alive) this.destroyContextForWindow(win);
     }
   }
 
@@ -262,8 +311,7 @@ class LingKumaZoteroPlugin {
     if (!context) return;
     for (const [win, candidate] of Array.from(this.contextsByWindow.entries())) {
       if (candidate !== context) continue;
-      try { candidate.destroy(); } catch (_) {}
-      this.contextsByWindow.delete(win);
+      this.destroyContextForWindow(win);
       break;
     }
   }
@@ -291,8 +339,11 @@ class LingKumaZoteroPlugin {
     // Zotero PDF readers are not on LingKuma upstream's small URL whitelist.
     // Mark the actual PDF.js text surface so the original PDF highlight styles apply.
     try {
-      if (doc.querySelector(".textLayer, .pdfViewer, #viewerContainer, #viewer")) {
-        doc.documentElement.classList.add("pdf-viewer");
+      const root = doc.documentElement;
+      if (doc.querySelector(".textLayer, .pdfViewer, #viewerContainer, #viewer") &&
+          !root.classList.contains("pdf-viewer")) {
+        root.classList.add("pdf-viewer");
+        root.dataset.lingkumaPdfViewerClass = "true";
       }
     } catch (_) {}
     const existing = doc.getElementById("lingkuma-zotero-upstream-style");
@@ -332,6 +383,11 @@ class LingKumaZoteroPlugin {
 
   cleanupStylesheet(win) {
     try {
+      const root = win?.document?.documentElement;
+      if (root?.dataset?.lingkumaPdfViewerClass === "true") {
+        root.classList.remove("pdf-viewer");
+        delete root.dataset.lingkumaPdfViewerClass;
+      }
       win?.document?.getElementById("lingkuma-zotero-upstream-style")?.remove();
       win?.document?.getElementById("lingkuma-zotero-style-patch")?.remove();
       win?.document?.getElementById("lingkuma-tooltip-host")?.remove();
@@ -415,6 +471,20 @@ class LingKumaZoteroPlugin {
     }
   }
 
+  async ensureDefaultDictionaryForContext(context) {
+    let sourceLanguage = "";
+    try {
+      sourceLanguage = String(context?._eval(`String(globalThis.__LINGKUMA_ZOTERO_LANGUAGE_BRIDGE__?.inferSourceLanguage?.('', '', document.documentElement) || '')`) || "").trim();
+    } catch (_) {}
+    const targetLanguage = String(this.state?.getTargetLanguage?.() || "").trim();
+    if (!sourceLanguage || !targetLanguage) return null;
+    try {
+      return await this.lookup.ensureApplicableDefaultDictionary(sourceLanguage, targetLanguage);
+    } catch (error) {
+      this.reportError(error, "default dictionary pair check: ");
+      return null;
+    }
+  }
   async injectReader(reader, { reason = "unknown", force = false } = {}) {
     if (!this.started) return;
     this.pruneDeadContexts();
@@ -468,6 +538,17 @@ class LingKumaZoteroPlugin {
         }
         if (!this.loadAdapterScript(context, "language_bridge.js")) {
           throw new Error("Critical Zotero language compatibility adapter failed: language_bridge.js");
+        }
+        if (!this.loadAdapterScript(context, "edge_tts_bridge.js")) {
+          throw new Error("Critical Zotero Edge TTS lifecycle adapter failed: edge_tts_bridge.js");
+        }
+        this.ensureDefaultDictionaryForContext(context);
+
+        if (!this.loadAdapterScript(context, "lookup_ui.js")) {
+          throw new Error("Critical Zotero lookup UI adapter failed: lookup_ui.js");
+        }
+        if (!this.loadAdapterScript(context, "word_explosion_bridge.js")) {
+          throw new Error("Critical Zotero Word Explosion adapter failed: word_explosion_bridge.js");
         }
         if (!this.loadAdapterScript(context, "glass_fallback.js")) {
           throw new Error("Critical Zotero Gecko glass adapter failed: glass_fallback.js");
@@ -579,6 +660,11 @@ class LingKumaZoteroPlugin {
     if (options.lang) utterance.lang = options.lang;
     if (Number.isFinite(Number(options.rate))) utterance.rate = Number(options.rate);
     if (Number.isFinite(Number(options.pitch))) utterance.pitch = Number(options.pitch);
+    const preferredVoice = String(options.voice || "").trim().toLowerCase();
+    if (preferredVoice && typeof win.speechSynthesis.getVoices === "function") {
+      const voice = win.speechSynthesis.getVoices().find(candidate => String(candidate?.name || "").toLowerCase() === preferredVoice);
+      if (voice) utterance.voice = voice;
+    }
     this.speechUtterance = utterance;
     await new Promise((resolve, reject) => {
       utterance.onend = resolve;
@@ -587,9 +673,29 @@ class LingKumaZoteroPlugin {
     });
   }
 
-  async playAudioMessage(message) {
+  async playAudioMessage(message, sender = {}) {
     const text = message?.text || message?.sentence || message?.data?.text || message?.options?.text;
     const url = message?.url || message?.audioUrl || message?.data?.url;
+    if (message?.audioType === "playEdgeTTS") {
+      const tabId = sender?.tab?.id;
+      const frameId = sender?.frameId;
+      const context = this.host?.contextsForTab?.(tabId)
+        ?.find(candidate => candidate.id === frameId && !candidate.destroyed);
+      if (!context) throw new Error("Originating LingKuma reader context is no longer available");
+      await context.playEdgeTTS({
+        text: String(text || ""),
+        voice: String(message?.voice || "en-US-AriaNeural"),
+        language: String(message?.lang || message?.language || "en-US"),
+        rate: message?.rate ?? "default",
+        volume: message?.volume ?? "default",
+        pitch: message?.pitch ?? "default",
+      });
+      return;
+    }
+    const unsupportedRemoteTypes = new Set(["playGptTTS", "playMinimaxi", "playSupertoneTTS"]);
+    if (unsupportedRemoteTypes.has(message?.audioType)) {
+      throw new Error(`TTS provider is intentionally unsupported in the Zotero port: ${message.audioType}`);
+    }
     if (url) {
       const win = Zotero.getMainWindow();
       this.stopAudio();
@@ -599,6 +705,13 @@ class LingKumaZoteroPlugin {
     }
     if (text) {
       const options = { ...(message?.options || {}) };
+      const isLocalPlayback = message?.audioType === "playLocal" || message?.action === "playLocal";
+      if (isLocalPlayback) {
+        const config = this.state?.storage?.ttsConfig || {};
+        if (String(config.localTTSVoice || "").trim()) options.voice = String(config.localTTSVoice).trim();
+        if (Number.isFinite(Number(config.localTTSRate))) options.rate = Number(config.localTTSRate);
+        if (Number.isFinite(Number(config.localTTSPitch))) options.pitch = Number(config.localTTSPitch);
+      }
       // Upstream LingKuma sends the source language at the top level for
       // playLocal/playAudio. Preserve that contract so Chinese/Japanese/Korean
       // source text is spoken with a matching system voice.
@@ -609,6 +722,9 @@ class LingKumaZoteroPlugin {
   }
 
   stopAudio() {
+    for (const context of Array.from(this.host?.contexts || [])) {
+      try { context.stopEdgeTTS?.(); } catch (_) {}
+    }
     try { Zotero.getMainWindow()?.speechSynthesis?.cancel(); } catch (_) {}
     try { this.audioElement?.pause(); } catch (_) {}
     this.audioElement = null;

@@ -70,6 +70,13 @@
     return LABELS[base] ? base : null;
   }
 
+  function sameLanguageFamily(left, right) {
+    const normalizedLeft = normalizeSourceLanguage(left);
+    const normalizedRight = normalizeSourceLanguage(right);
+    if (!normalizedLeft || !normalizedRight) return false;
+    return normalizedLeft.split('-')[0] === normalizedRight.split('-')[0];
+  }
+
   function sourceLanguageForRoot(root, word = '') {
     const square = String(root?.querySelector?.('#languageSquare')?.textContent || '').trim();
     const fromSquare = normalizeSourceLanguage(square);
@@ -145,7 +152,7 @@
 
     const runtime = globalThis.chrome?.runtime;
     if (runtime?.sendMessage && !runtime.sendMessage.__lkZoteroLanguageWrapped) {
-      originalRuntimeSendMessage = runtime.sendMessage.bind(runtime);
+      originalRuntimeSendMessage = runtime.sendMessage;
       const wrappedSend = function(...args) {
         const messageIndex = (typeof args[0] === 'string' && args[1] && typeof args[1] === 'object') ? 1 : 0;
         const message = args[messageIndex];
@@ -157,12 +164,12 @@
           const text = String(message.text || message.sentence || '');
           const context = String(message.contextSentence || message.sentence || '');
           const strong = strongSourceLanguage(text, context);
-          if (strong) {
+          if (strong && !sameLanguageFamily(message.lang || message.language, strong)) {
             args[messageIndex] = { ...message, lang: strong, language: strong };
             persistSourceLanguage(text, strong);
           }
         }
-        return originalRuntimeSendMessage(...args);
+        return Reflect.apply(originalRuntimeSendMessage, runtime, args);
       };
       wrappedSend.__lkZoteroLanguageWrapped = true;
       runtime.sendMessage = wrappedSend;
@@ -404,7 +411,10 @@
   globalThis.__LINGKUMA_ZOTERO_LANGUAGE_BRIDGE__ = {
     installed: true,
     version: '1.0.1',
-    inferSourceLanguage: strongSourceLanguage,
+    inferSourceLanguage(surface, sentence, root) {
+      return normalizeSourceLanguage(strongSourceLanguage(surface, sentence))
+        || sourceLanguageForRoot(root, surface);
+    },
     localizeTag(raw, _target = targetLanguage, source = pageSourceLanguage()) {
       return localizeRawTag(raw, normalizeSourceLanguage(source) || 'en');
     },

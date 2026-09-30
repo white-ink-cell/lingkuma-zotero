@@ -1,221 +1,87 @@
 # LingKuma for Zotero
 
-[English](README.md) | [简体中文](README_zh.md) | [日本語](README_ja.md) | [한국어](README_ko.md)
+[English](README.md) | **简体中文** | [日本語](README_ja.md) | [한국어](README_ko.md)
 
-**See it. Click it. Learn it.**  
-**哪里不会点哪里**
+这是基于 **LingKuma 1.1.1** 制作的非官方 Zotero 桌面移植版，让 LingKuma 的高亮、查词、翻译 / AI、整句分析、词库、TTS 和明暗主题功能可以在 Zotero 的 PDF / EPUB 阅读环境中使用。
 
-[LingKuma 原项目](https://github.com/lingkuma/LingKuma) · [LingKuma Wiki](https://docs.lingkuma.org) · [LingKuma 官网](https://lingkuma.org/) · [Calibre 移植版](https://github.com/white-ink-cell/lingkuma-calibre)
+> **Zotero 移植版发布 / 维护：[`white-ink-cell`](https://github.com/white-ink-cell)**  
+> 本仓库不是 LingKuma 或 Zotero 的官方版本。LingKuma 原项目的作者、版权和许可证保持不变；`white-ink-cell` 仅表示本 Zotero 移植版的发布与维护者。
 
-LingKuma —— *让知识跨越语言的障碍* —— 是一款围绕阅读设计的翻译与语言学习工具。
+## 界面截图
 
-你不需要等到“学会”一门语言之后，才能开始阅读这门语言的论文、书籍和文档。
+浅色主题，英文 → 中文翻译：
 
-遇到不认识的单词，**点一下**。  
-遇到看不懂的句子，**点一下**。
+<img src="docs/images/zotero-light-chinese.png" alt="LingKuma for Zotero 浅色主题中文翻译" width="900">
 
-LingKuma 帮助你阅读仍在学习中的语言内容，让你在阅读过程中自然地扩大词汇量、熟悉语法和表达方式，并逐渐提高对这门语言的理解能力。
+深色主题，英文 → 俄文翻译：
 
-> **先享受阅读，再在阅读中学会一门新的语言。**
+<img src="docs/images/zotero-dark-russian.png" alt="LingKuma for Zotero 深色主题俄文翻译" width="900">
 
-## LingKuma 可以做什么？
+## 主要改动
 
-- 点击单词查看释义
-- 翻译并分析完整句子
-- 使用 **Dictionary + Quick Context + AI Detail** 更快、更准确的地查词
-- 使用字典真人发音收听单词发音，可分别选择美音或英音
-- 在阅读过程中积累词汇、释义和个人学习记录
-- 使用 AI 辅助理解语法、上下文与复杂句子
-- 使用“单词爆炸”快速查看当前句中的多个单词
-- 通过自定义按钮一键打开外部词典、搜索引擎或 Wikipedia 等百科网站
-- 使用 Bionic Reading、Reading Ruler 和 POS Highlight
-- 使用可选 WebDAV 备份 / 恢复学习数据
-- 支持亮色和暗色主题
+本移植版主要进行了四项适配。
 
-更多 LingKuma 使用说明和平台文档，请查看 [LingKuma Wiki](https://docs.lingkuma.org)。
+### 1. Zotero 运行环境适配
 
-## 截图
+在 LingKuma 外部增加 Zotero 兼容层，让原本依赖浏览器扩展环境的功能可以在 Zotero 阅读器中运行，同时尽量保持 LingKuma 原始功能和代码结构不变。
 
-亮色主题，英文 → 中文翻译：
+### 2. 句子选取优化
 
-<img src="docs/images/lingkuma-zotero-word-lookup-light.png" alt="LingKuma for Zotero light theme with Chinese translation" width="900">
+PDF.js 会把视觉上的一句话拆成多个定位文本片段，部分标点和排版也可能导致原版只选中半句话。移植版增加了句子边界判断和 PDF 文本重建规则，使整句翻译和 Word Explosion 更可靠地取得完整句子。
 
-暗色主题，英文 → 中文翻译：
+### 3. 磨砂玻璃效果适配
 
-<img src="docs/images/lingkuma-zotero-word-lookup-dark.png" alt="LingKuma for Zotero dark theme with Russian translation" width="900">
+LingKuma 原版的液态玻璃效果依赖 Chromium 特有的渲染能力，而 Zotero 阅读器基于 Gecko，无法完整实现。移植版保留原来的 UI 和主题逻辑，并使用 Zotero 能稳定显示的磨砂玻璃效果作为兼容方案。
 
-暗色主题，英文 → 俄文翻译：
+### 4. 多语言翻译适配
 
-<img src="docs/images/zotero-dark-russian.png" alt="LingKuma for Zotero dark theme with Russian translation" width="900">
-
-## Zotero 移植版
-
-这是开源项目 LingKuma 的非官方 Zotero 移植版。
-
-Zotero 移植版增加了：
-
-- 适配当前 Zotero 10，同时继续兼容 Zotero 9
-- 改进 PDF / EPUB 阅读中的句子选取
-- 更完整的断句与断行修复
-- 显式英文连字符复合词识别
-- Dictionary + Quick Context 加速查词
-- 适用于 Zotero 的磨砂玻璃效果
-- 与 Zotero 内置 PDF / EPUB 阅读环境集成
-- 集成在 Zotero 内的 LingKuma 原生设置页面
-
-## v1.1.0 本次更新
-
-### 更新 Zotero 10 兼容性
-
-旧版 LingKuma for Zotero 基于更早的 Zotero 插件环境，在当前 Zotero 中可能已经无法正常安装或工作。
-
-本次更新重新适配 **Zotero 10.0.x**，同时继续兼容 **Zotero 9.x**。
-
-移植所使用的 LingKuma 上游也从旧版基线更新到 **LingKuma 1.1.1**。
-
-### 更快的查词：Dictionary + Quick Context + AI
-
-过去普通词义较大程度依赖 AI，因此简单查词也可能受到生成速度影响；AI 有时还会把“当前单词”和它所在的短语一起解释，例如形容词和后面的名词都显示成同一整段短语，让人难以判断哪个释义对应哪个词。
-
-现在把查词职责拆成三层：
-
-1. **Dictionary（字典）**：快速提供基础词义、词性、词形、IPA 和发音等较稳定的词典信息。
-2. **Quick Context（快速语境）**：使用**完整当前句子**进行快速、非生成式的语境翻译，再取出当前查词单位在该句中的意思。
-3. **AI Detail（AI 深度解释）**：继续负责语法、复杂用法、句子分析和更深入的解释。
-
-因此，普通查词不再大幅依赖 AI 的生成速度，同时又保留 AI 在复杂理解上的优势。
-
-### “单词爆炸”更快
-
-“单词爆炸”中每个可见单词的小释义，在正常路径下不再分别等待一次 AI 请求，而是优先使用 Quick Context。
-
-整句翻译和更深入的 AI 分析仍然保留。
-
-### 延续并增强断句与句子选择
-
-本次继续保留旧版 Zotero 移植中已经验证过的句子兼容修复，并进一步保持：
-
-- 改进 PDF 定位文本的句子重建；
-- 减少只取半句或误跨句的问题；
-- 更保守地处理缩写、首字母、数字小数、引号、括号、冒号和分号；
-- 修复明显由 PDF / EPUB 排版断行造成的连字符断词。
-
-### 支持带横杠的复合词
-
-过去下面这类词可能会被错误拆开：
-
-- `well-known`
-- `out-of-sample`
-- `peer-on-peer`
-
-现在会尽可能把这种显式英文连字符复合词视为一个完整的查词和学习单位。
-
-而 `inter-` + 换行 + `national` 这种由排版断行造成的情况仍然单独处理，并在明确时保守修复为 `international`。
-
-### 发音升级：字典真人发音 + IPA + 美音 / 英音
-
-英语查词的发音从单纯依赖 TTS，升级为**字典真人发音优先**：
-
-- 有可靠数据时显示当前实际词形的 IPA；
-- 美音和英音可以分别显示并独立播放；
-- 有字典真人录音时优先使用真人录音；
-- 当前实际词形没有录音时，再使用 TTS。
-
-最上方单词的默认发音规则为：
-
-- 只有美音录音 → 播放美音；
-- 只有英音录音 → 播放英音；
-- 美音和英音都有 → **默认美音**；
-- 两种录音都没有 → 使用 TTS 兜底。
-
-这对 `books`、`worked`、`studies`、`working` 等 `-s / -ed / -ing` 实际词形尤其重要。
-
-### 阅读与学习功能继续保留
-
-本次升级继续保留或恢复适用于 Zotero 的 LingKuma 阅读工作流，包括：
-
-- 生词 / 熟词状态与保存的词义；
-- 例句与学习记录；
-- AI 句子分析和更深入的单词解释；
-- Bionic Reading；
-- Reading Ruler；
-- POS Highlight；
-- 自定义外部搜索 / 词典 / 百科按钮；
-- 本地词库管理；
-- WebDAV 备份 / 恢复；
-- EPUB 文本修复选项；
-- Zotero 兼容的主题和弹窗行为。
-
-## 当前语言范围
-
-LingKuma 原项目仍然是多语言工具，但这次新增的**本地字典加速目前主要针对英语源文本**。
-
-本版本中：
-
-- 内置本地词典是 **英语 → 简体中文**；
-- Quick Context 在服务支持的情况下可以按照用户设置的目标语言工作；
-- 其他源语言对应的本地字典包目前还没有一起加入。
-
-因此，这一版最明显的速度与词义稳定性提升集中在**英语源文本阅读**。后续版本计划继续扩展更多语言组合的字典加速。
+原版部分 AI Prompt 和语言处理逻辑默认以中文为目标语言。移植版补充了源语言识别和目标语言适配，使翻译、AI 解释、TTS 语言信息及相关语言显示能够按照用户选择的语言工作。
 
 ## 安装
 
-1. 从 **GitHub Releases** 下载 `lingkuma-zotero-1.1.0.xpi`。
+1. 在 **GitHub Releases** 下载 `lingkuma-zotero-1.0.1.xpi`。
 2. 打开 **Zotero → 工具 → 插件**。
-3. 使用 **从文件安装插件**（也可以直接将 `.xpi` 拖入插件窗口）。
+3. 选择 **Install Add-on From File / 从文件安装插件**（也可以把 `.xpi` 拖入插件窗口）。
 4. 选择下载的 `.xpi` 文件。
-5. 如 Zotero 提示则重启。
+5. 重启 Zotero。
 
-> 不要将 GitHub 自动生成的源码 ZIP 作为 Zotero 插件安装。请使用 Release 中提供的 `.xpi` 文件。
-
-## 其他版本
-
-- [LingKuma for Calibre](https://github.com/white-ink-cell/lingkuma-calibre)
-- [LingKuma](https://github.com/lingkuma/LingKuma)
+> 不要把 GitHub 自动生成的源码 ZIP 当作 Zotero 插件安装包，请使用 Releases 中的 `.xpi`。
 
 ## 支持环境
 
-- Zotero 9.x
 - Zotero 10.0.x
-- PDF 和 EPUB 阅读器集成
-- Windows 与 macOS 为主要桌面支持目标
-- Linux 为尽力兼容，不作为正式发布测试目标
+- PDF / EPUB 阅读器
+- Windows / macOS / Linux
 
 ## 设置
 
-设置界面已经集成到 Zotero 中。
+设置界面直接集成在 Zotero 中，包括语言与 AI 设置、词库管理、TTS、界面显示以及可选的 WebDAV 备份 / 恢复。
 
-打开 **编辑 → 设置 → LingKuma for Zotero**。
+## 词典数据与可选自定义导入
 
-当前包括语言和翻译设置、AI Provider / 提示词、词汇管理、Dictionary、TTS、弹窗与阅读辅助，以及可选的 WebDAV 备份 / 恢复。
+G-004 非发布测试包内置了经过校验的英语 → 简体中文默认 `.lkdict`。LingKuma 会自动将其复制并校验到 Zotero 数据目录，普通使用无需下载或手动导入。仍可在 **Zotero → 设置 → LingKuma → Dictionary / 词典** 中按需导入自定义 `.lkdict`；切回 **Default Dictionary / 默认词典** 不会删除已导入文件。该内置测试资源不代表公开发布词典或更新源承诺。
 
-## 隐私
+内置资源由 English Wiktionary 数据经 Wiktextract/Kaikki 派生，采用 CC BY-SA 4.0；数据快照、署名和许可证详情见 `licenses/ENGLISH-WIKTIONARY-DATA-NOTICE.txt`。词典文件不会进入 LingKuma 学习数据备份。
+## 数据与隐私
 
-LingKuma for Zotero 将本地状态存储在 Zotero 数据目录中。
+LingKuma for Zotero 的本地状态保存在 Zotero 数据目录中。使用翻译、AI、远程 TTS 或 WebDAV 时，完成所选功能所需的文本或数据可能会发送到相应服务。普通单词和句子翻译不会主动上传整份 PDF 或 EPUB 文件。
+
+Quick Context 会把当前完整句子（在句内标记当前查词单元）发送到 Microsoft Edge 的无密钥网页翻译端点；无需账户或 API key，也不会调用 AI。该端点属于网页服务而非有合同保证的正式 API；若其不可用，Quick Context 会独立失败，不会替换 Dictionary 或 AI。
 
 ## 上游项目与署名
 
-- 原项目：**[LingKuma](https://github.com/lingkuma/LingKuma)**
-- LingKuma Wiki：**[docs.lingkuma.org](https://docs.lingkuma.org)**
+- 原项目：**LingKuma**
 - 上游版本：**LingKuma 1.1.1**
-- Zotero 移植版维护与发布：**white-ink-cell**
+- Zotero 移植版维护 / 发布：**white-ink-cell**
 
-本仓库提供 LingKuma 的非官方 Zotero 移植版。
+本项目的目标是把 LingKuma 移植到 Zotero。除 Zotero 运行所需的兼容处理外，原项目的主要功能、UI、资源和设计逻辑均尽量保持不变。
 
-该移植版使 LingKuma 能够适配 Zotero 的阅读环境，同时尽可能保留原项目的核心功能、界面、资源和整体设计。Zotero 专用修改主要集中在运行环境兼容、句子选取、Dictionary / Quick Context、发音、复合词处理、磨砂玻璃效果和多语言翻译支持。
-
-更多信息请参阅 `UPSTREAM.md`。
-
-## 字典数据
-
-内置英语词典基于 **English Wiktionary** 贡献者数据，经 **Wiktextract** 提取并由 **Kaikki.org** 分发的数据生成。
-
-词典文本数据按照 **CC BY-SA 4.0** 分发。远程 Wikimedia Commons 发音文件继续遵循其来源页面所标注的独立许可证。
-
-详见 `licenses/ENGLISH-WIKTIONARY-DATA-NOTICE.txt` 和 `THIRD-PARTY-NOTICES.txt`。
+详细说明见 [`UPSTREAM_zh.md`](UPSTREAM_zh.md)。
 
 ## 许可证
 
-原 LingKuma 项目的作者署名、版权和许可证保持不变。
+LingKuma 原项目的作者、版权和许可证保持不变。Zotero 适配 / 兼容层见 [`LICENSE-ADAPTER.txt`](LICENSE-ADAPTER.txt)，LingKuma 上游许可证见 [`LICENSE-LINGKUMA.txt`](LICENSE-LINGKUMA.txt)，第三方资源声明见 [`THIRD-PARTY-NOTICES.txt`](THIRD-PARTY-NOTICES.txt)。
 
-Zotero 适配器和兼容层使用 `LICENSE-ADAPTER.txt` 中的许可证。原 LingKuma 的许可证保留在 `LICENSE-LINGKUMA.txt` 中，随项目一起提供的第三方许可证和声明记录在 `THIRD-PARTY-NOTICES.txt` 中。
+## 其他移植版
+
+- [LingKuma for Calibre](https://github.com/white-ink-cell/lingkuma-calibre)

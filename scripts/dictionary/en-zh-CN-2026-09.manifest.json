@@ -1,0 +1,33 @@
+{
+  "artifact": {
+    "format": "lingkuma-dictionary",
+    "schemaVersion": 1,
+    "sha256": "17b2869b9e4a8e323e95645db266f0393a05954847d0a07718d3a6546ef05690",
+    "size": 65585152
+  },
+  "build": {
+    "builderSHA256": "69ac467636e38327dffafe6a8c889d6e1e47a2b790ec6c4db13380efcaeef39a",
+    "python": "3.10.11",
+    "simplificationPolicy": "OpenCC t2s",
+    "sqlite": "3.40.1"
+  },
+  "counts": {
+    "englishRecords": 1492836,
+    "entries": 190043,
+    "pronunciationOnlyRecords": 131255,
+    "rejectedNoChineseMeaningOrLemma": 772877,
+    "sourceRecords": 10913997,
+    "stagedRecords": 719958
+  },
+  "license": {
+    "attribution": "Derived and modified from English Wiktionary contributors via Wiktextract/Kaikki; filtered, normalized, and converted to SQLite by LingKuma.",
+    "data": "CC BY-SA 4.0 (English Wiktionary extracted data)",
+    "url": "https://creativecommons.org/licenses/by-sa/4.0/"
+  },
+  "source": {
+    "sha256": "504d55e7053c742ffe24b49a6ebd0c8261a1cd4b352702a1940547088829f5e1",
+    "size": 2981020383,
+    "snapshot": "English Wiktionary dump dated 2026-09-02; retrieved 2026-09-29; source gzip reissued byte-differently with identical builder-relevant entries verified 2026-09-30",
+    "url": "https://kaikki.org/dictionary/raw-wiktextract-data.jsonl.gz"
+  }
+}

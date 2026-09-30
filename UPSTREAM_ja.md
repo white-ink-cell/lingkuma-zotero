@@ -2,7 +2,7 @@
 
 [English](UPSTREAM.md) | [简体中文](UPSTREAM_zh.md) | **日本語** | [한국어](UPSTREAM_ko.md)
 
-このプロジェクトは **LingKuma 1.1.0** の非公式 Zotero 移植版です。
+このプロジェクトは **LingKuma 1.1.1** の非公式 Zotero 移植版です。
 
 - 元プロジェクト：`lingkuma/LingKuma`
 - Zotero 移植版のメンテナンス / 公開：`white-ink-cell`

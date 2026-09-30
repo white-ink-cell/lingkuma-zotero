@@ -1,7 +1,33 @@
 (function() {
-  if (window.self !== window.top) {
+  function isYouTubeHost(hostname) {
+    return /(^|\.)youtube(?:-nocookie)?\.com$/i.test(hostname || '');
+  }
+
+
+  function shouldSkipFrameButton() {
+    if (window.self === window.top) {
+      return false;
+    }
+
+    // YouTube 主站的内部 frame 不应出现额外按钮；外部页面嵌入的 YouTube frame 仍可独立使用。
+    try {
+      let topIsYouTube = false;
+      try {
+        topIsYouTube = isYouTubeHost(window.top.location.hostname);
+      } catch (error) {
+        // 跨域时无法读取 top.location，继续使用当前 frame 信息。
+      }
+      return topIsYouTube;
+    } catch (error) {
+      return true;
+    }
+  }
+
+  if (shouldSkipFrameButton()) {
     return;
   }
+
+  const isTopFrame = window.self === window.top;
 
   const FLOATING_BUTTON_ENABLED_KEY = 'wordHighlightFloatingButtonEnabled';
   const HIGHLIGHT_ENABLED_KEY = 'enablePlugin';
@@ -348,6 +374,20 @@
       }
     });
   }
+
+  function registerFrameAndSyncRuntime() {
+    if (isTopFrame) {
+      requestHighlightRuntimeSync();
+      return;
+    }
+
+    chrome.runtime.sendMessage({ action: 'registerHighlightFrame' }, () => {
+      // Ask the background to lazily sync this newly-created frame with the
+      // shared top-level page state.
+      requestHighlightRuntimeSync();
+    });
+  }
+
   function toggleHighlight() {
     const enabled = !currentHighlightEnabled;
     updateHighlightState(enabled);
@@ -444,6 +484,10 @@
         top: ${BUTTON_HEIGHT + BUTTON_STACK_GAP}px;
       }
 
+      .lk-floating-slot--youtube {
+        top: ${(BUTTON_HEIGHT + BUTTON_STACK_GAP) * 2}px;
+      }
+
       .lk-floating-stack[data-dock="left"] .lk-floating-slot {
         opacity: 0.42;
         transform: translate3d(-${SIDE_DOCK_OFFSET}px, 0, 0);
@@ -479,6 +523,11 @@
       .lk-floating-stack[data-dock="top"] .lk-floating-slot--theme,
       .lk-floating-stack[data-dock="bottom"] .lk-floating-slot--theme {
         left: ${BUTTON_HEIGHT + BUTTON_STACK_GAP}px;
+      }
+
+      .lk-floating-stack[data-dock="top"] .lk-floating-slot--youtube,
+      .lk-floating-stack[data-dock="bottom"] .lk-floating-slot--youtube {
+        left: ${(BUTTON_HEIGHT + BUTTON_STACK_GAP) * 2}px;
       }
 
       .lk-floating-stack[data-dock="left"] .lk-floating-slot:hover,
@@ -592,6 +641,16 @@
       .lk-current-page-theme[data-pulse="true"] {
         -webkit-animation: lk-button-pop 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
         animation: lk-button-pop 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+
+      /* 临时性能诊断：停用悬浮按钮的持续/点击关键帧动画。
+       * 保留布局、拖拽和 hover 的 transition，便于确认 CPU/GPU 峰值是否由特效造成。 */
+      .lk-floating-highlight,
+      .lk-floating-highlight *,
+      .lk-floating-highlight .spark::before,
+      .lk-current-page-theme {
+        -webkit-animation: none !important;
+        animation: none !important;
       }
 
       .lk-floating-highlight[data-highlight="on"] {
@@ -927,6 +986,7 @@
 
     const baseX = currentPosition?.x ?? buttonStack.getBoundingClientRect().left;
     const baseY = currentPosition?.y ?? buttonStack.getBoundingClientRect().top;
+    const controlButton = event.currentTarget;
     pointerState = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -940,8 +1000,9 @@
     if (shadowRoot?.activeElement && shadowRoot.activeElement !== buttonWrap) {
       shadowRoot.activeElement.blur();
     }
-    delete buttonWrap.dataset.collapseAfterClick;
-    buttonWrap.setPointerCapture(event.pointerId);
+    delete controlButton.dataset.collapseAfterClick;
+    controlButton.setPointerCapture(event.pointerId);
+    pointerState.button = controlButton;
     event.preventDefault();
   }
 
@@ -956,8 +1017,8 @@
       pointerState.moved = true;
       buttonStack.dataset.dragging = 'true';
       buttonStack.dataset.dock = 'none';
-      buttonWrap.dataset.dragging = 'true';
-      delete buttonWrap.dataset.collapseAfterClick;
+      pointerState.button.dataset.dragging = 'true';
+      delete pointerState.button.dataset.collapseAfterClick;
     }
 
     if (!pointerState.moved) {
@@ -983,12 +1044,13 @@
 
     const wasMoved = pointerState.moved;
     const previousDock = pointerState.dock;
+    const controlButton = pointerState.button || buttonWrap;
     pointerState = null;
     delete buttonStack.dataset.dragging;
-    delete buttonWrap.dataset.dragging;
+    delete controlButton.dataset.dragging;
 
     try {
-      buttonWrap.releasePointerCapture(event.pointerId);
+      controlButton.releasePointerCapture(event.pointerId);
     } catch (error) {
       // Pointer capture may already be released by the browser.
     }
@@ -1000,11 +1062,25 @@
       const dock = currentPosition?.dock || previousDock || 'none';
       buttonStack.dataset.dock = dock;
       if (dock === 'none') {
-        delete buttonWrap.dataset.collapseAfterClick;
+        delete controlButton.dataset.collapseAfterClick;
       } else {
-        buttonWrap.dataset.collapseAfterClick = 'true';
+        controlButton.dataset.collapseAfterClick = 'true';
       }
-      toggleHighlight();
+      if (controlButton.dataset.youtube === 'true') {
+        const startOverlay = () => chrome.runtime.sendMessage({ action: 'ensureWordHighlightRuntime' }, () => {
+          if (chrome.runtime.lastError) return;
+          window.setTimeout(() => chrome.runtime.sendMessage({ action: 'toggleYoutubeVideoOverlay' }, response => {
+            if (!chrome.runtime.lastError && response?.overlayActive !== undefined) {
+              controlButton.dataset.overlay = response.overlayActive ? 'on' : 'off';
+            }
+          }), 50);
+        });
+        chrome.runtime.sendMessage({ action: 'getWordHighlightControlState' }, state => {
+          if (!chrome.runtime.lastError && state?.enabled !== true) {
+            chrome.runtime.sendMessage({ action: 'toggleWordHighlightFromFloatingButton', enabled: true }, startOverlay);
+          } else startOverlay();
+        });
+      } else toggleHighlight();
     }
 
     event.preventDefault();
@@ -1024,6 +1100,12 @@
   }
 
   function createButton(savedPosition, pageThemeOverride = null) {
+    // Only the top-level page displays the control; iframe contexts still
+    // register and synchronize state through initializeFloatingButton().
+    if (!isTopFrame) {
+      return;
+    }
+
     if (document.getElementById(ROOT_ID)) {
       return;
     }
@@ -1034,6 +1116,25 @@
 
     buttonStack = document.createElement('div');
     buttonStack.className = 'lk-floating-stack';
+    let youtubeSlot = null;
+
+    if (/^https?:\/\/(?:www\.|m\.)?youtube\.com\//i.test(location.href)) {
+      youtubeSlot = document.createElement('div');
+      youtubeSlot.className = 'lk-floating-slot lk-floating-slot--youtube';
+      const youtubeButton = document.createElement('button');
+      youtubeButton.className = 'lk-floating-highlight';
+      youtubeButton.dataset.youtube = 'true';
+      youtubeButton.type = 'button';
+      youtubeButton.textContent = 'SYNC';
+      youtubeButton.title = 'YouTube overlay';
+      youtubeButton.addEventListener('pointerdown', handlePointerDown);
+      youtubeButton.addEventListener('pointermove', handlePointerMove);
+      youtubeButton.addEventListener('pointerup', handlePointerUp);
+      youtubeButton.addEventListener('pointercancel', handlePointerUp);
+      youtubeButton.addEventListener('pointerleave', handlePointerLeave);
+      youtubeButton.addEventListener('keydown', handleKeyDown);
+      youtubeSlot.append(youtubeButton);
+    }
 
     highlightSlot = document.createElement('div');
     highlightSlot.className = 'lk-floating-slot lk-floating-slot--highlight';
@@ -1095,6 +1196,7 @@
     highlightSlot.append(buttonWrap);
     themeSlot.append(themeButtonWrap);
     buttonStack.append(highlightSlot, themeSlot);
+    if (youtubeSlot) buttonStack.append(youtubeSlot);
     shadowRoot.append(createStyles(), buttonStack);
 
     const mountRoot = document.documentElement || document.body;
@@ -1150,7 +1252,10 @@
   }
 
   function initializeFloatingButton() {
-    requestHighlightRuntimeSync();
+    console.debug('[LingKuma] button initialized', chrome.runtime.lastError ? chrome.runtime.lastError.message : null);
+
+
+    registerFrameAndSyncRuntime();
 
     chrome.storage.local.get({
       [FLOATING_BUTTON_ENABLED_KEY]: true,
@@ -1158,7 +1263,9 @@
       [POSITION_KEY]: null,
       [PAGE_THEME_OVERRIDES_KEY]: {}
     }, (result) => {
-      currentHighlightEnabled = result[HIGHLIGHT_ENABLED_KEY] !== false;
+      currentHighlightEnabled = isTopFrame
+        ? result[HIGHLIGHT_ENABLED_KEY] !== false
+        : false;
       const pageThemeOverride = (result[PAGE_THEME_OVERRIDES_KEY] || {})[getPageThemeKey()];
       const pageThemeIsDark = normalizePageThemeOverride(pageThemeOverride);
       currentPageThemeIsDark = pageThemeIsDark !== null

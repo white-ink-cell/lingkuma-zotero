@@ -1,3 +1,45 @@
+// YouTube creates utility/player frames (including about:blank) that do not
+// contain user-readable page text. Keep the runtime in the top YouTube page;
+// other sites retain their existing all-frame support for real reader frames.
+function isYouTubeHost(hostname) {
+  return /(^|\.)youtube(?:-nocookie)?\.com$/i.test(hostname || '');
+}
+
+function shouldSkipYouTubeFrame() {
+  if (window.self === window.top) {
+    return false;
+  }
+
+  if (isYouTubeHost(window.location.hostname)) {
+    return true;
+  }
+
+  const candidateUrls = [document.referrer];
+  try {
+    const ancestors = window.location.ancestorOrigins;
+    if (ancestors && ancestors.length) {
+      for (let i = 0; i < ancestors.length; i++) {
+        candidateUrls.push(ancestors[i]);
+      }
+    }
+  } catch (error) {
+    // Cross-origin frames may not expose ancestorOrigins.
+  }
+
+  return candidateUrls.some(url => {
+    try {
+      return isYouTubeHost(new URL(url).hostname);
+    } catch (error) {
+      return false;
+    }
+  });
+}
+
+const shouldSkipLingKumaFrame = shouldSkipYouTubeFrame();
+if (shouldSkipLingKumaFrame) {
+  globalThis.__lingkumaSkipHighlightFrame = true;
+}
+
 // 检测是否在iframe中运行
 // const isInIframe = window !== window.top;
 // // const isIframe =  (window.self !== window.top);
@@ -25,31 +67,31 @@
         // value
         // : 
         // "britain"
-let knownWords = new Set();
+var knownWords = new Set();
 
-let wordDetails = [];
-let wordRangesMap = new Map(); 
-let tooltipEl = null;
+var wordDetails = [];
+var wordRangesMap = new Map();
+var tooltipEl = null;
 // 新增全局变量，用于存储当前选中的单词
-let currentTooltipWord = null;
-let globalDarkMode = false;
+var currentTooltipWord = null;
+var globalDarkMode = false;
 
 // 新增全局变量，用于控制自动展开及保存最新鼠标事件
 
 
 
-let lastMouseEvent = null;
+var lastMouseEvent = null;
 // 添加全局变量
-let analysisWindow = null;
-let currentHighlight = null;
+var analysisWindow = null;
+var currentHighlight = null;
 // 新增高亮管理器相关变量
-let highlightManager = null;
+var highlightManager = null;
 
 
-let highlightChineseEnabled = true;
-let highlightJapaneseEnabled = true;
-let highlightKoreanEnabled = true;
-let highlightAlphabeticEnabled = true;
+var highlightChineseEnabled = true;
+var highlightJapaneseEnabled = true;
+var highlightKoreanEnabled = true;
+var highlightAlphabeticEnabled = true;
 
 const HIGHLIGHT_RUNTIME_STORAGE_KEYS = [
   'highlightChineseEnabled',
@@ -65,6 +107,11 @@ const HIGHLIGHT_RUNTIME_STORAGE_KEYS = [
 startHighlightRuntimeFromStorage();
 
 function startHighlightRuntimeFromStorage() {
+  if (shouldSkipLingKumaFrame) {
+    console.log('[LingKuma] 跳过 YouTube 子 iframe 高亮运行时:', window.location.href);
+    return;
+  }
+
   // 优化：合并所有storage读取为一次调用
   chrome.storage.local.get(HIGHLIGHT_RUNTIME_STORAGE_KEYS, function(result) {
     // 设置高亮语言开关
@@ -101,7 +148,7 @@ function startHighlightRuntimeFromStorage() {
     }
 
     // 继续执行原有的高亮初始化逻辑
-    highlightAllWords();
+    invokeHighlightAllWords();
   });
 }
 
@@ -115,6 +162,8 @@ function startHighlightRuntimeFromStorage() {
 initPlugin();
 
 function getInitialHighlightEnabled(result) {
+  // iframe 与顶层页面共用同一套 page/global 开关。这样阅读器新建的
+  // 章节 frame 会在运行时注入后立即继承当前页面状态。
   const scope = result.wordHighlightFloatingButtonScope === 'page' ? 'page' : 'global';
   if (scope !== 'page') {
     return result.enablePlugin !== false;
@@ -193,7 +242,7 @@ function initPlugin() {
       console.log('Highlight toggle message:', message.enabled);
       if (message.enabled) {
         console.log('Highlight toggle message:', message.enabled);
-        // Reapply highlight after rechecking page scope and blacklist for this frame.
+        // Reapply highlight after rechecking the shared page/global state.
         startHighlightRuntimeFromStorage();
       } else if (highlightManager) {
         highlightManager.highlightEnabled = false;
@@ -212,6 +261,15 @@ function initPlugin() {
       highlightManager = null;
     }
   });
+}
+
+function invokeHighlightAllWords() {
+  const highlightEntry = globalThis.highlightAllWords;
+  if (typeof highlightEntry === 'function') {
+    highlightEntry();
+  } else {
+    console.debug('[LingKuma] A2 尚未完成加载，跳过本次高亮初始化');
+  }
 }
 
 // 辅助函数：转义正则中需要的特殊字符
@@ -266,5 +324,3 @@ function isUrlInBlacklist(url, blacklistPatterns) {
     
     return false;
 }
-
-

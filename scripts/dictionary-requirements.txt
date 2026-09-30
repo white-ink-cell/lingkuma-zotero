@@ -1,0 +1,2 @@
+# Pinned build-only dependency for Simplified Chinese normalization.
+opencc-python-reimplemented==0.1.7

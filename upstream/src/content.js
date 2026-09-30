@@ -169,6 +169,13 @@ function showWordLimitNotification(message) {
 // 检查元素是否为 YouTube 上允许处理的元素
 // =======================
 function isAllowedYouTubeElement(parent) {
+  return Boolean(
+    parent &&
+    typeof parent.closest === 'function' &&
+    (parent.closest('span.ytAttributedStringHost.ytAttributedStringWhiteSpacePreWrap') ||
+     parent.closest('#title-row > #title > h1 > yt-formatted-string.ytd-watch-metadata') ||
+     parent.closest('p.YtmCommentRendererText > span.ytAttributedStringHost'))
+  );
   // 定义YouTube上允许处理的元素类名和ID
   const allowedYoutubeIdentifiers = [
     'ytp-caption-window-container',
@@ -187,17 +194,32 @@ function isAllowedYouTubeElement(parent) {
     'overlay-subtitle-container',
     'overlay-subtitle-list-container',
     'overlay-subtitle-list',
-    'subtitle-item'
+    'subtitle-item',
+    'ytd-comment-thread-renderer',
+    'ytd-comment-view-model',
+    'yt-attributed-string',
+    'YtmCommentRendererText',
+    'comment-content'
   ];
 
   // 检查元素是否属于允许的类或ID
-  let isAllowedElement = false;
+  let isAllowedElement = Boolean(
+    parent &&
+    typeof parent.closest === 'function' &&
+    parent.closest('.ytAttributedStringHost.ytAttributedStringWhiteSpacePreWrap')
+  );
 
   if (parent) {
     // 检查当前元素及其所有父元素
     let currentElement = parent;
 
     while (currentElement && !isAllowedElement) {
+      const tagName = (currentElement.tagName || '').toLowerCase();
+      if (allowedYoutubeIdentifiers.some(identifier => tagName === identifier)) {
+        isAllowedElement = true;
+        break;
+      }
+
       // 检查当前元素的ID
       if (currentElement.id && allowedYoutubeIdentifiers.some(id => currentElement.id.includes(id))) {
         isAllowedElement = true;

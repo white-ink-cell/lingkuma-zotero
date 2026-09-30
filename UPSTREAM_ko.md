@@ -2,7 +2,7 @@
 
 [English](UPSTREAM.md) | [简体中文](UPSTREAM_zh.md) | [日本語](UPSTREAM_ja.md) | **한국어**
 
-이 프로젝트는 **LingKuma 1.1.0**의 비공식 Zotero 포팅 버전입니다.
+이 프로젝트는 **LingKuma 1.1.1**의 비공식 Zotero 포팅 버전입니다.
 
 - 원 프로젝트: `lingkuma/LingKuma`
 - Zotero 포팅 버전 유지보수 / 배포: `white-ink-cell`

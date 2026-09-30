@@ -17,9 +17,9 @@
         <html:div class="lk-nav-group">
           <html:button type="button" class="lk-nav-heading" data-lk-toggle-group="database">数据库操作 <html:span>▾</html:span></html:button>
           <html:div class="lk-nav-sub" data-lk-group="database">
-            <html:button type="button" data-lk-page="cloud">Cloud Database</html:button>
             <html:button type="button" data-lk-page="webdav">WebDAV</html:button>
             <html:button type="button" data-lk-page="word-operations">单词库操作</html:button>
+            <html:button type="button" data-lk-page="dictionary">Dictionary / 词典</html:button>
             <html:button type="button" data-lk-page="import">导入已知单词</html:button>
             <html:button type="button" data-lk-page="backup">备份数据</html:button>
           </html:div>
@@ -35,7 +35,6 @@
             <html:button type="button" data-lk-page="prompt-tag">词性标签</html:button>
             <html:button type="button" data-lk-page="prompt-sentence">例句翻译</html:button>
             <html:button type="button" data-lk-page="prompt-analysis">句子解析</html:button>
-            <html:button type="button" data-lk-page="prompt-sidebar">侧边栏解析</html:button>
           </html:div>
         </html:div>
 
@@ -52,8 +51,6 @@
           <html:div class="lk-nav-sub" data-lk-group="tts">
             <html:button type="button" data-lk-page="tts-basic">基本设置</html:button>
             <html:button type="button" data-lk-page="tts-local">本地 TTS</html:button>
-            <html:button type="button" data-lk-page="tts-edge">Edge TTS</html:button>
-            <html:button type="button" data-lk-page="tts-gpt">GPT TTS</html:button>
             <html:button type="button" data-lk-page="tts-custom">自定义 URL</html:button>
           </html:div>
         </html:div>
@@ -120,7 +117,7 @@
             <html:label class="lk-switch"><html:input type="checkbox" data-lk-key="wordExplosionEnabled"/><html:span></html:span></html:label>
           </html:div>
           <html:div class="lk-setting-row">
-            <html:div><html:strong>词性高亮</html:strong><html:span>保留原版词性标签与学习状态高亮。</html:span></html:div>
+            <html:div><html:strong>Alphabetic word highlight / 字母语言单词高亮</html:strong><html:span>Highlight words written with alphabetic scripts; POS Highlight is configured separately below.</html:span></html:div>
             <html:label class="lk-switch"><html:input type="checkbox" data-lk-key="highlightAlphabeticEnabled"/><html:span></html:span></html:label>
           </html:div>
           <html:div class="lk-setting-row">
@@ -156,25 +153,65 @@
             <html:label class="lk-field"><html:span>韩语高亮</html:span><html:input type="checkbox" data-lk-key="highlightKoreanEnabled"/></html:label>
           </html:div>
         </html:div>
-      </html:section>
 
-      <!-- Cloud Database -->
-      <html:section class="lk-page" data-lk-page-panel="cloud" data-title="Cloud Database">
-        <html:div class="lk-card lk-donation-card">
-          <html:h2>捐赠与账号</html:h2>
-          <html:p>LingKuma 上游项目采用 MIT 许可证。这里保留原设置页的入口，但 Zotero 移植版不代替上游作者提供账号服务。</html:p>
-          <html:div class="lk-button-row">
-            <html:button type="button" class="lk-button purple" data-lk-action="open-afdian">爱发电 (afdian)</html:button>
-            <html:button type="button" class="lk-button green" data-lk-action="open-upstream">LingKuma GitHub</html:button>
+        <html:div class="lk-card">
+          <html:h3>Reader highlighting / 阅读高亮</html:h3>
+          <html:div class="lk-grid two">
+            <html:label class="lk-field"><html:span>Floating control scope / 悬浮开关范围</html:span><html:select data-lk-key="wordHighlightFloatingButtonScope"><html:option value="global">Global / 全局</html:option><html:option value="page">Current reader / 当前阅读器</html:option></html:select></html:label>
+            <html:label class="lk-field"><html:span>Detect Japanese kanji / 自动识别日语汉字</html:span><html:input type="checkbox" data-lk-key="autoDetectJapaneseKanji"/></html:label>
+            <html:label class="lk-field"><html:span>Use Kuromoji tokenizer / 使用 Kuromoji 分词</html:span><html:input type="checkbox" data-lk-key="useKuromojiTokenizer"/></html:label>
+            <html:label class="lk-field"><html:span>Auto-load Kuromoji / 自动加载 Kuromoji</html:span><html:input type="checkbox" data-lk-key="autoLoadKuromojiForJapanese"/></html:label>
           </html:div>
         </html:div>
+
         <html:div class="lk-card">
-          <html:h3>服务器配置</html:h3>
-          <html:div class="lk-setting-row"><html:div><html:strong>启用云端数据库</html:strong><html:span>仅保存配置。上游账号登录接口尚未接入 Zotero。</html:span></html:div><html:label class="lk-switch"><html:input type="checkbox" data-lk-key="cloudDbEnabled"/><html:span></html:span></html:label></html:div>
-          <html:div class="lk-setting-row"><html:div><html:strong>启用双写</html:strong><html:span>同时保留本地词库与云端副本。</html:span></html:div><html:label class="lk-switch"><html:input type="checkbox" data-lk-key="cloudDualWrite"/><html:span></html:span></html:label></html:div>
-          <html:div class="lk-setting-row"><html:div><html:strong>自建服务器</html:strong><html:span>保存自建 LingKuma 服务地址。</html:span></html:div><html:label class="lk-switch"><html:input type="checkbox" data-lk-key="cloudSelfHosted"/><html:span></html:span></html:label></html:div>
-          <html:label class="lk-field"><html:span>服务器 URL</html:span><html:input type="text" data-lk-key="cloudServerUrl" placeholder="https://example.com"/></html:label>
-          <html:div class="lk-note warning">Zotero 版当前可直接使用下方 WebDAV 完成跨设备词库与设置备份。Cloud Database 登录和付费账号验证仍属于浏览器扩展专属服务。</html:div>
+          <html:h3>Bionic Reading &amp; Reading Ruler</html:h3>
+          <html:div class="lk-grid two">
+            <html:label class="lk-field"><html:span>Enable Bionic Reading / 启用 Bionic</html:span><html:input type="checkbox" data-lk-key="bionicEnabled"/></html:label>
+            <html:label class="lk-field"><html:span>Bionic font / 字体</html:span><html:select data-lk-key="bionicFontFamily"><html:option value="auto">Auto</html:option><html:option value="'LXGWWenKai', serif">LXGW WenKai</html:option><html:option value="'Fanwood', serif">Fanwood</html:option><html:option value="Arial, sans-serif">Arial</html:option><html:option value="'Times New Roman', serif">Times New Roman</html:option><html:option value="'Courier New', monospace">Courier New</html:option><html:option value="Georgia, serif">Georgia</html:option><html:option value="Verdana, sans-serif">Verdana</html:option><html:option value="'Trebuchet MS', sans-serif">Trebuchet MS</html:option><html:option value="'Segoe UI', sans-serif">Segoe UI</html:option><html:option value="'Open Sans', sans-serif">Open Sans</html:option><html:option value="Roboto, sans-serif">Roboto</html:option><html:option value="'Helvetica Neue', Helvetica, sans-serif">Helvetica Neue</html:option></html:select></html:label>
+            <html:label class="lk-field"><html:span>Bionic font size / 字号</html:span><html:input type="number" min="8" max="64" data-lk-key="bionicFontSize" data-lk-type="number"/></html:label>
+            <html:label class="lk-field"><html:span>Enable Reading Ruler / 启用阅读标尺</html:span><html:input type="checkbox" data-lk-key="readingRuler"/></html:label>
+            <html:label class="lk-field"><html:span>Inverted mask / 反色遮罩</html:span><html:input type="checkbox" data-lk-object="rulerSettings" data-lk-subkey="isInverted"/></html:label>
+            <html:label class="lk-field"><html:span>Width mode / 宽度模式</html:span><html:select data-lk-object="rulerSettings" data-lk-subkey="widthMode"><html:option value="auto">Auto</html:option><html:option value="screen">Screen</html:option><html:option value="custom">Custom</html:option></html:select></html:label>
+            <html:label class="lk-field"><html:span>Custom width / 自定义宽度</html:span><html:input type="number" min="50" max="2400" data-lk-object="rulerSettings" data-lk-subkey="customWidth" data-lk-type="number"/></html:label>
+            <html:label class="lk-field"><html:span>Height / 高度</html:span><html:input type="number" min="10" max="100" data-lk-object="rulerSettings" data-lk-subkey="height" data-lk-type="number"/></html:label>
+            <html:label class="lk-field"><html:span>Opacity / 透明度</html:span><html:input type="number" min="0" max="1" step="0.05" data-lk-object="rulerSettings" data-lk-subkey="opacity" data-lk-type="number"/></html:label>
+            <html:label class="lk-field"><html:span>Color / 颜色</html:span><html:input type="text" data-lk-object="rulerSettings" data-lk-subkey="color" placeholder="#6f6f6f"/></html:label>
+          </html:div>
+        </html:div>
+
+        <html:div class="lk-card">
+          <html:h3>POS Highlight / 词性高亮</html:h3>
+          <html:div class="lk-grid two">
+            <html:label class="lk-field"><html:span>Enable POS Highlight / 启用</html:span><html:input type="checkbox" data-lk-key="posHighlightEnabled"/></html:label>
+            <html:label class="lk-field"><html:span>Language / 语言</html:span><html:select data-lk-key="posHighlightLanguage"><html:option value="auto">Auto</html:option><html:option value="english">English</html:option><html:option value="german">Deutsch</html:option></html:select></html:label>
+            <html:label class="lk-field"><html:span>Verbs / 动词</html:span><html:input type="checkbox" data-lk-key="posHighlightVerbEnabled"/></html:label>
+            <html:label class="lk-field"><html:span>Verb background / 动词背景</html:span><html:input type="checkbox" data-lk-key="posHighlightVerbBackgroundEnabled"/></html:label>
+            <html:label class="lk-field"><html:span>Verb background color</html:span><html:input type="text" data-lk-key="posHighlightVerbBackgroundColor"/></html:label>
+            <html:label class="lk-field"><html:span>Verb background opacity</html:span><html:input type="range" min="0" max="100" step="1" data-lk-key="posHighlightVerbBackgroundOpacity" data-lk-type="number"/></html:label>
+            <html:label class="lk-field"><html:span>Verb underline</html:span><html:input type="checkbox" data-lk-key="posHighlightVerbUnderlineEnabled"/></html:label>
+            <html:label class="lk-field"><html:span>Verb underline style</html:span><html:select data-lk-key="posHighlightVerbUnderlineStyle"><html:option value="wavy">Wavy</html:option><html:option value="solid">Solid</html:option><html:option value="dotted">Dotted</html:option><html:option value="dashed">Dashed</html:option></html:select></html:label>
+            <html:label class="lk-field"><html:span>Verb underline color</html:span><html:input type="text" data-lk-key="posHighlightVerbUnderlineColor"/></html:label>
+            <html:label class="lk-field"><html:span>Verb underline thickness</html:span><html:input type="number" min="1" max="6" data-lk-key="posHighlightVerbUnderlineThickness" data-lk-type="number"/></html:label>
+            <html:label class="lk-field"><html:span>Verb underline position</html:span><html:select data-lk-key="posHighlightVerbUnderlinePosition"><html:option value="bottom">Bottom</html:option><html:option value="top">Top</html:option></html:select></html:label>
+            <html:label class="lk-field"><html:span>Prepositions / 介词</html:span><html:input type="checkbox" data-lk-key="posHighlightPrepositionEnabled"/></html:label>
+            <html:label class="lk-field"><html:span>Preposition background</html:span><html:input type="checkbox" data-lk-key="posHighlightPrepositionBackgroundEnabled"/></html:label>
+            <html:label class="lk-field"><html:span>Preposition background color</html:span><html:input type="text" data-lk-key="posHighlightPrepositionBackgroundColor"/></html:label>
+            <html:label class="lk-field"><html:span>Preposition background opacity</html:span><html:input type="range" min="0" max="100" step="1" data-lk-key="posHighlightPrepositionBackgroundOpacity" data-lk-type="number"/></html:label>
+            <html:label class="lk-field"><html:span>Preposition underline</html:span><html:input type="checkbox" data-lk-key="posHighlightPrepositionUnderlineEnabled"/></html:label>
+            <html:label class="lk-field"><html:span>Preposition underline style</html:span><html:select data-lk-key="posHighlightPrepositionUnderlineStyle"><html:option value="wavy">Wavy</html:option><html:option value="solid">Solid</html:option><html:option value="dotted">Dotted</html:option><html:option value="dashed">Dashed</html:option></html:select></html:label>
+            <html:label class="lk-field"><html:span>Preposition underline color</html:span><html:input type="text" data-lk-key="posHighlightPrepositionUnderlineColor"/></html:label>
+            <html:label class="lk-field"><html:span>Preposition underline thickness</html:span><html:input type="number" min="1" max="6" data-lk-key="posHighlightPrepositionUnderlineThickness" data-lk-type="number"/></html:label>
+            <html:label class="lk-field"><html:span>Preposition underline position</html:span><html:select data-lk-key="posHighlightPrepositionUnderlinePosition"><html:option value="bottom">Bottom</html:option><html:option value="top">Top</html:option></html:select></html:label>
+          </html:div>
+        </html:div>
+
+        <html:div class="lk-card">
+          <html:h3>TTS language behavior / TTS 语言行为</html:h3>
+          <html:div class="lk-grid two">
+            <html:label class="lk-field"><html:span>Auto-detect sentence language / 自动检测句子语言</html:span><html:input type="checkbox" data-lk-key="sentenceTTSAutoDetectLanguage"/></html:label>
+            <html:label class="lk-field"><html:span>Auto-play word TTS / 自动播放单词发音</html:span><html:input type="checkbox" data-lk-key="enableAutoWordTTS"/></html:label>
+          </html:div>
         </html:div>
       </html:section>
 
@@ -219,6 +256,21 @@
         </html:div>
       </html:section>
 
+      <!-- Dictionary runtime data (separate from learning vocabulary/backups). -->
+      <html:section class="lk-page" data-lk-page-panel="dictionary" data-title="Dictionary / 词典">
+        <html:div class="lk-card">
+          <html:h3>Dictionary / 词典</html:h3>
+          <html:p class="lk-muted">Default dictionaries are checked per source → target pair. A custom .lkdict stays local and is separate from vocabulary learning data.</html:p>
+          <html:div class="lk-button-row">
+            <html:button type="button" class="lk-button" data-lk-action="dictionary-default">Default Dictionary</html:button>
+            <html:button type="button" class="lk-button" data-lk-action="dictionary-custom">Custom Local Dictionary</html:button>
+            <html:button type="button" class="lk-button primary" data-lk-action="dictionary-import">Import .lkdict</html:button>
+            <html:button type="button" class="lk-button" data-lk-action="dictionary-refresh">Refresh status</html:button>
+          </html:div>
+          <html:div id="lk-dictionary-status" class="lk-note">Dictionary status has not been checked.</html:div>
+          <html:p class="lk-hint">Only standard .lkdict files are accepted. Import validates the file before replacing the selected custom dictionary.</html:p>
+        </html:div>
+      </html:section>
       <!-- 导入 -->
       <html:section class="lk-page" data-lk-page-panel="import" data-title="导入已知单词">
         <html:div class="lk-card">
@@ -228,25 +280,26 @@
           <html:textarea id="lk-import-text" class="lk-textarea tall" placeholder="粘贴 JSON，或每行输入一个单词"></html:textarea>
           <html:div class="lk-grid two compact">
             <html:label class="lk-field"><html:span>导入方式</html:span><html:select id="lk-import-mode"><html:option value="merge">合并，不覆盖已有记录</html:option><html:option value="replace">替换全部词库</html:option></html:select></html:label>
-            <html:label class="lk-field"><html:span>纯词表状态</html:span><html:select id="lk-import-status"><html:option value="5">5 完全掌握</html:option><html:option value="4">4 几乎掌握</html:option><html:option value="1">1 学习中</html:option><html:option value="0">0 未知</html:option></html:select></html:label>
+            <html:label class="lk-field"><html:span>纯词表语言</html:span><html:select id="lk-import-language"><html:option value="en">English</html:option><html:option value="de">Deutsch</html:option><html:option value="fr">Français</html:option><html:option value="es">Español</html:option><html:option value="it">Italiano</html:option><html:option value="ja">日本語</html:option><html:option value="ko">한국어</html:option><html:option value="ru">Русский</html:option><html:option value="custom">Custom ISO 639-1</html:option></html:select></html:label>
+            <html:label class="lk-field"><html:span>自定义语言代码</html:span><html:input id="lk-import-custom-language" type="text" maxlength="2" pattern="[a-z]{2}" placeholder="例如 nl"/></html:label>
+            <html:label class="lk-field"><html:span>纯词表状态</html:span><html:select id="lk-import-status"><html:option value="5">5 完全掌握</html:option><html:option value="4">4 几乎掌握</html:option><html:option value="3">3 较熟悉</html:option><html:option value="2">2 继续学习</html:option><html:option value="1">1 学习中</html:option><html:option value="0">0 未知</html:option></html:select></html:label>
           </html:div>
           <html:div class="lk-button-row"><html:button type="button" class="lk-button primary" data-lk-action="import-words">开始导入</html:button><html:button type="button" class="lk-button" data-lk-action="clear-import">清空输入</html:button></html:div>
         </html:div>
       </html:section>
 
-      <!-- 备份 -->
-      <html:section class="lk-page" data-lk-page-panel="backup" data-title="备份数据">
+      <!-- Learning-data backup only: settings and credentials stay local. -->
+      <html:section class="lk-page" data-lk-page-panel="backup" data-title="Learning data backup / 学习数据备份">
         <html:div class="lk-card">
-          <html:h3>词库与设置备份</html:h3>
-          <html:p class="lk-muted">备份内容包括词汇状态、释义、例句、标签及全部 Zotero 适配设置。</html:p>
+          <html:h3>Learning data backup / 学习数据备份</html:h3>
+          <html:p class="lk-muted">Exports vocabulary status, translations, example sentences, and tags. Zotero settings and credentials are never included or restored.</html:p>
           <html:div class="lk-button-row">
-            <html:button type="button" class="lk-button primary" data-lk-action="copy-full-backup">复制完整备份 JSON</html:button>
-            <html:button type="button" class="lk-button" data-lk-action="copy-settings-backup">仅复制设置 JSON</html:button>
+            <html:button type="button" class="lk-button primary" data-lk-action="copy-learning-backup">Copy learning-data JSON / 复制学习数据 JSON</html:button>
           </html:div>
-          <html:textarea id="lk-backup-text" class="lk-textarea tall" placeholder="点击上方按钮生成备份；也可以粘贴备份后恢复。"></html:textarea>
+          <html:textarea id="lk-backup-text" class="lk-textarea tall" placeholder="Generate a learning-data backup above, or paste one here to merge or replace the vocabulary database."></html:textarea>
           <html:div class="lk-button-row">
-            <html:button type="button" class="lk-button" data-lk-action="restore-merge">恢复并合并</html:button>
-            <html:button type="button" class="lk-button danger" data-lk-action="restore-replace">恢复并替换</html:button>
+            <html:button type="button" class="lk-button" data-lk-action="restore-merge">Merge learning data / 合并学习数据</html:button>
+            <html:button type="button" class="lk-button danger" data-lk-action="restore-replace">Replace learning data / 替换学习数据</html:button>
           </html:div>
         </html:div>
       </html:section>
@@ -254,13 +307,34 @@
       <!-- API 基本 -->
       <html:section class="lk-page" data-lk-page-panel="api-basic" data-title="API 配置 · 基本设置">
         <html:div class="lk-card">
-          <html:h3>AI Provider</html:h3>
-          <html:label class="lk-field"><html:span>AI 通道</html:span><html:select data-lk-object="aiConfig" data-lk-subkey="aiChannel"><html:option value="diy">LingKuma 默认免费 AI / 自定义兼容接口</html:option><html:option value="zerozero">0-0 API</html:option><html:option value="ohmygpt">OhMyGPT</html:option></html:select></html:label>
+          <html:h3>Quick Context · Microsoft Edge Translator</html:h3>
+          <html:p class="lk-muted">Quick Context sends the full current sentence, with the lookup word marked inside it, to Microsoft's keyless Edge translation service. It requires no account or API key and never invokes AI.</html:p>
           <html:div class="lk-grid two">
-            <html:label class="lk-field full"><html:span>OpenAI-compatible Base URL</html:span><html:input type="text" data-lk-object="aiConfig" data-lk-subkey="apiBaseURL" placeholder="留空使用 LingKuma 默认免费 AI"/></html:label>
-            <html:label class="lk-field"><html:span>模型</html:span><html:input type="text" data-lk-object="aiConfig" data-lk-subkey="apiModel" placeholder="留空使用默认模型"/></html:label>
-            <html:label class="lk-field"><html:span>Temperature</html:span><html:input type="number" min="0" max="2" step="0.1" data-lk-object="aiConfig" data-lk-subkey="apiTemperature" data-lk-type="number"/></html:label>
-            <html:label class="lk-field full"><html:span>API Key</html:span><html:input type="password" data-lk-object="aiConfig" data-lk-subkey="apiKey" placeholder="留空使用默认免费 AI"/></html:label>
+            <html:label class="lk-field"><html:span>Timeout (seconds)</html:span><html:input type="number" min="3" max="60" data-lk-object="translationConfig" data-lk-subkey="timeoutSeconds" data-lk-type="number"/></html:label>
+          </html:div>
+          <html:div class="lk-note">This is a keyless web service rather than a contracted cloud API. If Microsoft changes or blocks it, Quick Context fails independently; Dictionary and AI remain available.</html:div>
+        </html:div>
+        <html:div class="lk-card">
+          <html:h3>AI Provider</html:h3>
+          <html:p class="lk-muted">Manage OpenAI-compatible endpoints. Leave every Base URL empty to use the bundled LingKuma service.</html:p>
+          <html:div class="lk-grid two compact">
+            <html:label class="lk-field"><html:span>Profile</html:span><html:select id="lk-ai-profile-select"></html:select></html:label>
+            <html:label class="lk-field"><html:span>Poll enabled profiles</html:span><html:input type="checkbox" data-lk-object="aiConfig" data-lk-subkey="enableApiPolling"/></html:label>
+          </html:div>
+          <html:div class="lk-button-row">
+            <html:button type="button" class="lk-button" data-lk-action="ai-profile-add">Add profile</html:button>
+            <html:button type="button" class="lk-button" data-lk-action="ai-profile-copy">Copy profile</html:button>
+            <html:button type="button" class="lk-button danger" data-lk-action="ai-profile-delete">Delete profile</html:button>
+          </html:div>
+          <html:div class="lk-grid two">
+            <html:label class="lk-field"><html:span>Profile name</html:span><html:input type="text" data-lk-profile-field="name"/></html:label>
+            <html:label class="lk-field full"><html:span>OpenAI-compatible Base URL</html:span><html:input type="text" data-lk-profile-field="apiBaseURL" placeholder="留空使用 LingKuma 默认免费 AI"/></html:label>
+            <html:label class="lk-field"><html:span>模型</html:span><html:input type="text" data-lk-profile-field="apiModel" placeholder="留空使用默认模型"/></html:label>
+            <html:label class="lk-field"><html:span>Temperature</html:span><html:input type="number" min="0" max="2" step="0.1" data-lk-profile-field="apiTemperature" data-lk-type="number"/></html:label>
+            <html:label class="lk-field full"><html:span>API Key</html:span><html:input type="password" data-lk-profile-field="apiKey" placeholder="留空使用默认免费 AI"/></html:label>
+            <html:label class="lk-field"><html:span>Include in polling</html:span><html:input type="checkbox" data-lk-profile-field="enablePolling"/></html:label>
+            <html:label class="lk-field"><html:span>Exclude temperature</html:span><html:input type="checkbox" data-lk-profile-field="excludeTemperature"/></html:label>
+            <html:label class="lk-field full"><html:span>Custom request body (key=JSON, one per line)</html:span><html:textarea class="lk-textarea" data-lk-profile-field="customRequestBody"></html:textarea></html:label>
           </html:div>
           <html:div class="lk-note">只有填写自定义 Base URL 时，插件才切换到你自己的 API。留空时继续使用从 LingKuma 源码移植的默认服务。</html:div>
         </html:div>
@@ -285,10 +359,6 @@
       <html:section class="lk-page" data-lk-page-panel="prompt-analysis" data-title="API 配置 · 句子解析">
         <html:div class="lk-card"><html:h3>句子解析 AI 提示词</html:h3><html:textarea class="lk-textarea prompt" data-lk-key="aiAnalysisPrompt" placeholder="留空使用 LingKuma 原版默认提示词"></html:textarea><html:button type="button" class="lk-button" data-lk-action="clear-setting" data-key="aiAnalysisPrompt">恢复默认提示词</html:button></html:div>
       </html:section>
-      <html:section class="lk-page" data-lk-page-panel="prompt-sidebar" data-title="API 配置 · 侧边栏解析">
-        <html:div class="lk-card"><html:h3>侧边栏 AI 解析提示词</html:h3><html:textarea class="lk-textarea prompt" data-lk-key="sidebarAIPrompt" placeholder="留空使用 LingKuma 原版默认提示词"></html:textarea><html:button type="button" class="lk-button" data-lk-action="clear-setting" data-key="sidebarAIPrompt">恢复默认提示词</html:button></html:div>
-      </html:section>
-
       <!-- Word list -->
       <html:section class="lk-page" data-lk-page-panel="word-list" data-title="本地词库">
         <html:div class="lk-card">
@@ -310,43 +380,100 @@
 
       <!-- TTS -->
       <html:section class="lk-page" data-lk-page-panel="tts-basic" data-title="TTS 配置 · 基本设置">
-        <html:div class="lk-card"><html:h3>发音渠道</html:h3><html:div class="lk-grid two"><html:label class="lk-field"><html:span>单词发音渠道</html:span><html:select data-lk-key="wordTTSProvider"><html:option value="local">系统本地 TTS</html:option><html:option value="edge">Edge TTS</html:option><html:option value="gpt">GPT TTS</html:option><html:option value="custom">自定义 URL</html:option></html:select></html:label><html:label class="lk-field"><html:span>句子发音渠道</html:span><html:select data-lk-key="sentenceTTSProvider"><html:option value="local">系统本地 TTS</html:option><html:option value="edge">Edge TTS</html:option><html:option value="gpt">GPT TTS</html:option><html:option value="custom">自定义 URL</html:option></html:select></html:label><html:label class="lk-field"><html:span>启用单词 TTS</html:span><html:input type="checkbox" data-lk-key="enableWordTTS"/></html:label><html:label class="lk-field"><html:span>启用句子 TTS</html:span><html:input type="checkbox" data-lk-key="enableSentenceTTS"/></html:label></html:div></html:div>
+        <html:div class="lk-card"><html:h3>发音渠道</html:h3><html:div class="lk-grid two"><html:label class="lk-field"><html:span>单词发音渠道</html:span><html:select data-lk-object="ttsConfig" data-lk-subkey="wordTTSProvider"><html:option value="edge">Microsoft Edge TTS</html:option><html:option value="local">系统本地 TTS</html:option><html:option value="custom">自定义 URL 1</html:option><html:option value="custom2">自定义 URL 2</html:option></html:select></html:label><html:label class="lk-field"><html:span>句子发音渠道</html:span><html:select data-lk-object="ttsConfig" data-lk-subkey="sentenceTTSProvider"><html:option value="edge">Microsoft Edge TTS</html:option><html:option value="local">系统本地 TTS</html:option><html:option value="custom">自定义 URL 1</html:option><html:option value="custom2">自定义 URL 2</html:option></html:select></html:label><html:label class="lk-field"><html:span>启用单词 TTS</html:span><html:input type="checkbox" data-lk-key="enableWordTTS"/></html:label><html:label class="lk-field"><html:span>启用句子 TTS</html:span><html:input type="checkbox" data-lk-key="enableSentenceTTS"/></html:label></html:div></html:div>
       </html:section>
       <html:section class="lk-page" data-lk-page-panel="tts-local" data-title="TTS 配置 · 本地 TTS">
-        <html:div class="lk-card"><html:h3>系统语音</html:h3><html:label class="lk-field"><html:span>默认语音名称（留空自动选择）</html:span><html:input type="text" data-lk-key="localTTSVoice"/></html:label><html:div class="lk-grid two"><html:label class="lk-field"><html:span>语速</html:span><html:input type="range" min="0.1" max="2" step="0.1" data-lk-key="localTTSRate" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>音调</html:span><html:input type="range" min="0.1" max="2" step="0.1" data-lk-key="localTTSPitch" data-lk-type="number"/></html:label></html:div><html:div class="lk-button-row"><html:button type="button" class="lk-button" data-lk-action="test-local-tts">测试本地 TTS</html:button></html:div></html:div>
-      </html:section>
-      <html:section class="lk-page" data-lk-page-panel="tts-edge" data-title="TTS 配置 · Edge TTS">
-        <html:div class="lk-card"><html:h3>Edge TTS</html:h3><html:label class="lk-field"><html:span>自动根据语言选择声音</html:span><html:input type="checkbox" data-lk-key="edgeTTSAutoVoice"/></html:label><html:label class="lk-field"><html:span>声音名称</html:span><html:input type="text" data-lk-key="edgeTTSVoice" placeholder="zh-CN-XiaoxiaoNeural"/></html:label><html:div class="lk-grid three"><html:label class="lk-field"><html:span>语速</html:span><html:input type="range" min="-100" max="100" step="5" data-lk-key="edgeTTSRate" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>音量</html:span><html:input type="range" min="-100" max="100" step="5" data-lk-key="edgeTTSVolume" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>音调</html:span><html:input type="range" min="-50" max="50" step="5" data-lk-key="edgeTTSPitch" data-lk-type="number"/></html:label></html:div></html:div>
-      </html:section>
-      <html:section class="lk-page" data-lk-page-panel="tts-gpt" data-title="TTS 配置 · GPT TTS">
-        <html:div class="lk-card"><html:h3>GPT-compatible TTS</html:h3><html:div class="lk-grid two"><html:label class="lk-field full"><html:span>Base URL</html:span><html:input type="text" data-lk-key="gptTTSBaseURL"/></html:label><html:label class="lk-field full"><html:span>API Key</html:span><html:input type="password" data-lk-key="gptTTSApiKey"/></html:label><html:label class="lk-field"><html:span>模型</html:span><html:input type="text" data-lk-key="gptTTSModel" placeholder="gpt-4o-mini-tts"/></html:label><html:label class="lk-field"><html:span>Voice</html:span><html:input type="text" data-lk-key="gptTTSVoice" placeholder="alloy"/></html:label><html:label class="lk-field"><html:span>输出格式</html:span><html:select data-lk-key="gptTTSResponseFormat"><html:option value="mp3">MP3</html:option><html:option value="wav">WAV</html:option><html:option value="opus">OPUS</html:option></html:select></html:label><html:label class="lk-field"><html:span>语速</html:span><html:input type="number" min="0.25" max="4" step="0.05" data-lk-key="gptTTSSpeed" data-lk-type="number"/></html:label></html:div><html:label class="lk-field"><html:span>Instructions</html:span><html:textarea class="lk-textarea" data-lk-key="gptTTSInstructions"></html:textarea></html:label></html:div>
+        <html:div class="lk-card"><html:h3>系统语音</html:h3><html:label class="lk-field"><html:span>默认语音名称（留空自动选择）</html:span><html:input type="text" data-lk-object="ttsConfig" data-lk-subkey="localTTSVoice"/></html:label><html:div class="lk-grid two"><html:label class="lk-field"><html:span>语速</html:span><html:input type="range" min="0.1" max="2" step="0.1" data-lk-object="ttsConfig" data-lk-subkey="localTTSRate" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>音调</html:span><html:input type="range" min="0.1" max="2" step="0.1" data-lk-object="ttsConfig" data-lk-subkey="localTTSPitch" data-lk-type="number"/></html:label></html:div><html:div class="lk-button-row"><html:button type="button" class="lk-button" data-lk-action="test-local-tts">测试本地 TTS</html:button></html:div></html:div>
       </html:section>
       <html:section class="lk-page" data-lk-page-panel="tts-custom" data-title="TTS 配置 · 自定义 URL">
-        <html:div class="lk-card"><html:h3>自定义语音 URL 模板</html:h3><html:p class="lk-muted">支持变量 {word} 与 {lang}。点击发音时插件会替换变量并请求该 URL。</html:p><html:label class="lk-field"><html:span>URL 模板 1</html:span><html:textarea class="lk-textarea" data-lk-key="wordAudioUrlTemplate"></html:textarea></html:label><html:label class="lk-field"><html:span>URL 模板 2</html:span><html:textarea class="lk-textarea" data-lk-key="wordAudioUrlTemplate2"></html:textarea></html:label></html:div>
+        <html:div class="lk-card"><html:h3>自定义语音 URL 模板</html:h3><html:p class="lk-muted">支持变量 {word} 与 {lang}。点击发音时插件会替换变量并请求该 URL。</html:p><html:label class="lk-field"><html:span>URL 模板 1</html:span><html:textarea class="lk-textarea" data-lk-object="ttsConfig" data-lk-subkey="wordAudioUrlTemplate"></html:textarea></html:label><html:label class="lk-field"><html:span>URL 模板 2</html:span><html:textarea class="lk-textarea" data-lk-object="ttsConfig" data-lk-subkey="wordAudioUrlTemplate2"></html:textarea></html:label></html:div>
       </html:section>
 
       <!-- Popup -->
       <html:section class="lk-page" data-lk-page-panel="popup-layout" data-title="弹窗设置 · 弹窗行为">
-        <html:div class="lk-card"><html:h3>单词弹窗行为</html:h3><html:div class="lk-grid two"><html:label class="lk-field"><html:span>仅点击时打开</html:span><html:input type="checkbox" data-lk-key="clickOnlyTooltip"/></html:label><html:label class="lk-field"><html:span>自动展开弹窗</html:span><html:input type="checkbox" data-lk-key="autoExpandTooltip"/></html:label><html:label class="lk-field"><html:span>自动关闭弹窗</html:span><html:input type="checkbox" data-lk-key="autoCloseTooltip"/></html:label><html:label class="lk-field"><html:span>自动刷新弹窗</html:span><html:input type="checkbox" data-lk-key="autoRefreshTooltip"/></html:label><html:label class="lk-field"><html:span>优先显示在单词上方</html:span><html:input type="checkbox" data-lk-key="preferPopupAbove"/></html:label><html:label class="lk-field"><html:span>选择文本时优先向下</html:span><html:input type="checkbox" data-lk-key="selectionPopupPreferDown"/></html:label><html:label class="lk-field"><html:span>单词弹窗间距</html:span><html:input type="number" min="0" max="100" data-lk-key="tooltipGap" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>选区弹窗间距</html:span><html:input type="number" min="0" max="100" data-lk-key="selectionPopupGap" data-lk-type="number"/></html:label></html:div><html:div class="lk-button-row"><html:button type="button" class="lk-button" data-lk-action="reset-minimized">清除缩小状态</html:button><html:button type="button" class="lk-button primary" data-lk-action="apply-now">重新载入当前阅读器</html:button></html:div></html:div>
-        <html:div class="lk-card"><html:h3>整句翻译面板</html:h3><html:div class="lk-grid two"><html:label class="lk-field"><html:span>触发模式</html:span><html:select data-lk-key="wordExplosionTriggerMode"><html:option value="click">点击</html:option><html:option value="hover">悬停</html:option></html:select></html:label><html:label class="lk-field"><html:span>位置模式</html:span><html:select data-lk-key="wordExplosionPositionMode"><html:option value="auto">自动</html:option><html:option value="manual">手动</html:option></html:select></html:label><html:label class="lk-field"><html:span>字号</html:span><html:input type="number" min="10" max="28" data-lk-key="wordExplosionFontSize" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>最大宽度</html:span><html:input type="number" min="320" max="1400" data-lk-key="wordExplosionMaxWidth" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>单词排列</html:span><html:select data-lk-key="wordExplosionWordsLayout"><html:option value="single-column">单列</html:option><html:option value="double-column">双列</html:option><html:option value="triple-column">三列</html:option></html:select></html:label><html:label class="lk-field"><html:span>每词释义数</html:span><html:select data-lk-key="wordExplosionTranslationCount"><html:option value="1">1</html:option><html:option value="2">2</html:option><html:option value="3">3</html:option><html:option value="all">全部</html:option></html:select></html:label><html:label class="lk-field"><html:span>整句翻译数量</html:span><html:select data-lk-key="explosionSentenceTranslationCount" data-lk-type="number"><html:option value="1">1</html:option><html:option value="2">2</html:option></html:select></html:label><html:label class="lk-field"><html:span>优先向上</html:span><html:input type="checkbox" data-lk-key="wordExplosionPreferUp"/></html:label><html:label class="lk-field"><html:span>高亮当前句子</html:span><html:input type="checkbox" data-lk-key="wordExplosionHighlightSentence"/></html:label><html:label class="lk-field"><html:span>句子高亮颜色</html:span><html:input type="text" data-lk-key="wordExplosionHighlightColor"/></html:label></html:div></html:div>
+        <html:div class="lk-card"><html:h3>单词弹窗行为</html:h3><html:div class="lk-grid two"><html:label class="lk-field"><html:span>仅点击时打开</html:span><html:input type="checkbox" data-lk-key="clickOnlyTooltip"/></html:label><html:label class="lk-field"><html:span>自动展开弹窗</html:span><html:input type="checkbox" data-lk-key="autoExpandTooltip"/></html:label><html:label class="lk-field"><html:span>自动关闭弹窗</html:span><html:input type="checkbox" data-lk-key="autoCloseTooltip"/></html:label><html:label class="lk-field"><html:span>自动刷新弹窗</html:span><html:input type="checkbox" data-lk-key="autoRefreshTooltip"/></html:label><html:label class="lk-field"><html:span>优先显示在单词上方</html:span><html:input type="checkbox" data-lk-key="preferPopupAbove"/></html:label><html:label class="lk-field"><html:span>选择文本时优先向下</html:span><html:input type="checkbox" data-lk-key="selectionPopupPreferDown"/></html:label><html:label class="lk-field"><html:span>单词弹窗间距</html:span><html:input type="number" min="0" max="200" data-lk-key="tooltipGap" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>选区弹窗间距</html:span><html:input type="number" min="0" max="200" data-lk-key="selectionPopupGap" data-lk-type="number"/></html:label></html:div><html:div class="lk-button-row"><html:button type="button" class="lk-button" data-lk-action="reset-minimized">清除缩小状态</html:button><html:button type="button" class="lk-button primary" data-lk-action="apply-now">重新载入当前阅读器</html:button></html:div></html:div>
+        <html:div class="lk-card"><html:h3>整句翻译面板</html:h3><html:div class="lk-grid two"><html:label class="lk-field"><html:span>触发模式</html:span><html:select data-lk-key="wordExplosionTriggerMode"><html:option value="click">点击</html:option><html:option value="hover">悬停</html:option></html:select></html:label><html:label class="lk-field"><html:span>位置模式</html:span><html:select data-lk-key="wordExplosionPositionMode"><html:option value="auto">自动</html:option><html:option value="manual">手动</html:option></html:select></html:label><html:label class="lk-field"><html:span>字号</html:span><html:select data-lk-key="wordExplosionFontSize" data-lk-type="number"><html:option value="10">10</html:option><html:option value="11">11</html:option><html:option value="12">12</html:option><html:option value="13">13</html:option><html:option value="14">14</html:option><html:option value="15">15</html:option><html:option value="16">16</html:option><html:option value="17">17</html:option><html:option value="18">18</html:option><html:option value="20">20</html:option></html:select></html:label><html:label class="lk-field"><html:span>最大宽度</html:span><html:input type="number" min="20" max="200000" step="10" data-lk-key="wordExplosionMaxWidth" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>单词排列</html:span><html:select data-lk-key="wordExplosionWordsLayout"><html:option value="single-column">单列</html:option><html:option value="double-column">双列</html:option><html:option value="triple-column">三列</html:option></html:select></html:label><html:label class="lk-field"><html:span>每词释义数</html:span><html:select data-lk-key="wordExplosionTranslationCount"><html:option value="1">1</html:option><html:option value="2">2</html:option><html:option value="3">3</html:option><html:option value="all">全部</html:option></html:select></html:label><html:label class="lk-field"><html:span>整句翻译数量</html:span><html:select data-lk-key="explosionSentenceTranslationCount" data-lk-type="number"><html:option value="1">1</html:option><html:option value="2">2</html:option></html:select></html:label><html:label class="lk-field"><html:span>优先向上</html:span><html:input type="checkbox" data-lk-key="wordExplosionPreferUp"/></html:label><html:label class="lk-field"><html:span>高亮当前句子</html:span><html:input type="checkbox" data-lk-key="wordExplosionHighlightSentence"/></html:label><html:label class="lk-field"><html:span>句子高亮颜色</html:span><html:input type="text" data-lk-key="wordExplosionHighlightColor"/></html:label><html:label class="lk-field"><html:span>句子高亮透明度</html:span><html:input type="range" min="0" max="100" step="1" data-lk-key="wordExplosionHighlightOpacity" data-lk-type="number"/></html:label></html:div></html:div>
+        <html:div class="lk-card">
+          <html:h3>Learning content / 学习内容</html:h3>
+          <html:div class="lk-grid two">
+            <html:label class="lk-field"><html:span>Save AI translations / 保存 AI 释义</html:span><html:input type="checkbox" data-lk-key="autoAddAITranslations"/></html:label>
+            <html:label class="lk-field"><html:span>Save example sentences / 保存例句</html:span><html:input type="checkbox" data-lk-key="autoAddExampleSentences"/></html:label>
+            <html:label class="lk-field"><html:span>Example sentence limit / 例句上限</html:span><html:input type="number" min="1" max="999" data-lk-key="autoAddSentencesLimit" data-lk-type="number"/></html:label>
+            <html:label class="lk-field"><html:span>Expand word tooltip / 默认展开单词弹窗</html:span><html:input type="checkbox" data-lk-key="defaultExpandTooltip"/></html:label>
+            <html:label class="lk-field"><html:span>Expand sentence tooltip / 默认展开整句弹窗</html:span><html:input type="checkbox" data-lk-key="defaultExpandSententsTooltip"/></html:label>
+          </html:div>
+        </html:div>
+        <html:div class="lk-card">
+          <html:h3>Word Explosion layout / 单词爆炸布局</html:h3>
+          <html:div class="lk-grid two">
+            <html:label class="lk-field"><html:span>Layout / 布局</html:span><html:select data-lk-key="wordExplosionLayout"><html:option value="vertical">Vertical</html:option><html:option value="horizontal">Horizontal</html:option></html:select></html:label>
+            <html:label class="lk-field"><html:span>Underline / 下划线</html:span><html:input type="checkbox" data-lk-key="wordExplosionUnderlineEnabled"/></html:label>
+            <html:label class="lk-field"><html:span>Underline style / 样式</html:span><html:select data-lk-key="wordExplosionUnderlineStyle"><html:option value="solid">Solid</html:option><html:option value="wavy">Wavy</html:option><html:option value="dotted">Dotted</html:option></html:select></html:label>
+            <html:label class="lk-field"><html:span>Underline position / 位置</html:span><html:select data-lk-key="wordExplosionUnderlinePosition"><html:option value="bottom">Bottom</html:option><html:option value="top">Top</html:option><html:option value="both">Both</html:option></html:select></html:label>
+            <html:label class="lk-field"><html:span>Underline color / 颜色</html:span><html:input type="text" data-lk-key="wordExplosionUnderlineColor" placeholder="#955FBD80"/></html:label>
+            <html:label class="lk-field"><html:span>Underline opacity / 透明度</html:span><html:input type="range" min="0" max="100" step="1" data-lk-key="wordExplosionUnderlineOpacity" data-lk-type="number"/></html:label>
+            <html:label class="lk-field"><html:span>Underline thickness / 粗细</html:span><html:input type="number" min="1" max="10" data-lk-key="wordExplosionUnderlineThickness" data-lk-type="number"/></html:label>
+          </html:div>
+        </html:div>
+        <html:div class="lk-card">
+          <html:h3>Word Explosion behavior / 单词爆炸行为</html:h3>
+          <html:div class="lk-grid two">
+            <html:label class="lk-field"><html:span>Priority mode / 优先模式</html:span><html:input type="checkbox" data-lk-key="explosionPriorityMode"/></html:label>
+            <html:label class="lk-field"><html:span>Highlight with TTS / 发音时高亮</html:span><html:input type="checkbox" data-lk-key="explosionHighlightWithTTS"/></html:label>
+            <html:label class="lk-field"><html:span>Highlight without TTS / 静音时高亮</html:span><html:input type="checkbox" data-lk-key="explosionHighlightNoTTS"/></html:label>
+            <html:label class="lk-field"><html:span>TTS only / 仅发音</html:span><html:input type="checkbox" data-lk-key="explosionTTSOnly"/></html:label>
+            <html:label class="lk-field"><html:span>Highlight speed (ms) / 高亮速度</html:span><html:input type="number" min="10" max="500" step="10" data-lk-key="explosionHighlightSpeed" data-lk-type="number"/></html:label>
+            <html:label class="lk-field"><html:span>Known-sentence animation / 熟句动画</html:span><html:input type="checkbox" data-lk-key="showKnownSentenceAnimation"/></html:label>
+          </html:div>
+        </html:div>
+        <html:div class="lk-card">
+          <html:h3>Keyboard shortcuts / 快捷键</html:h3>
+          <html:div class="lk-grid three compact">
+            <html:label class="lk-field"><html:span>Query word</html:span><html:input type="text" maxlength="16" data-lk-key="wordQueryKey" data-lk-shortcut="true"/></html:label>
+            <html:label class="lk-field"><html:span>Copy sentence</html:span><html:input type="text" maxlength="16" data-lk-key="copySentenceKey" data-lk-shortcut="true"/></html:label>
+            <html:label class="lk-field"><html:span>Analysis window</html:span><html:input type="text" maxlength="16" data-lk-key="analysisWindowKey" data-lk-shortcut="true"/></html:label>
+            <html:label class="lk-field"><html:span>Sentence explosion</html:span><html:input type="text" maxlength="16" data-lk-key="sentenceExplosionKey" data-lk-shortcut="true"/></html:label>
+            <html:label class="lk-field"><html:span>Status 0</html:span><html:input type="text" maxlength="16" data-lk-object="wordStatusKeys" data-lk-subkey="0" data-lk-shortcut="true"/></html:label>
+            <html:label class="lk-field"><html:span>Status 1</html:span><html:input type="text" maxlength="16" data-lk-object="wordStatusKeys" data-lk-subkey="1" data-lk-shortcut="true"/></html:label>
+            <html:label class="lk-field"><html:span>Status 2</html:span><html:input type="text" maxlength="16" data-lk-object="wordStatusKeys" data-lk-subkey="2" data-lk-shortcut="true"/></html:label>
+            <html:label class="lk-field"><html:span>Status 3</html:span><html:input type="text" maxlength="16" data-lk-object="wordStatusKeys" data-lk-subkey="3" data-lk-shortcut="true"/></html:label>
+            <html:label class="lk-field"><html:span>Status 4</html:span><html:input type="text" maxlength="16" data-lk-object="wordStatusKeys" data-lk-subkey="4" data-lk-shortcut="true"/></html:label>
+            <html:label class="lk-field"><html:span>Status 5</html:span><html:input type="text" maxlength="16" data-lk-object="wordStatusKeys" data-lk-subkey="5" data-lk-shortcut="true"/></html:label>
+            <html:label class="lk-field"><html:span>Toggle status</html:span><html:input type="text" maxlength="16" data-lk-object="wordStatusKeys" data-lk-subkey="toggle" data-lk-shortcut="true"/></html:label>
+            <html:label class="lk-field"><html:span>Add AI translation</html:span><html:input type="text" maxlength="16" data-lk-object="wordStatusKeys" data-lk-subkey="addAITranslation" data-lk-shortcut="true"/></html:label>
+            <html:label class="lk-field"><html:span>Close tooltip</html:span><html:input type="text" maxlength="16" data-lk-object="wordStatusKeys" data-lk-subkey="closeTooltip" data-lk-shortcut="true"/></html:label>
+          </html:div>
+        </html:div>
       </html:section>
 
       <html:section class="lk-page" data-lk-page-panel="background" data-title="弹窗设置 · 背景设置">
-        <html:div class="lk-card"><html:h3>弹窗外观</html:h3><html:div class="lk-grid two"><html:label class="lk-field"><html:span>弹窗主题</html:span><html:select data-lk-key="tooltipThemeMode"><html:option value="auto">自动</html:option><html:option value="light">浅色</html:option><html:option value="dark">深色</html:option></html:select></html:label><html:label class="lk-field"><html:span>图案背景</html:span><html:input type="checkbox" data-lk-special="tooltipBackgroundEnabled"/></html:label><html:label class="lk-field"><html:span>液态玻璃效果</html:span><html:input type="checkbox" data-lk-key="liquidGlassEnabled"/></html:label><html:label class="lk-field"><html:span>分析窗口玻璃效果</html:span><html:input type="checkbox" data-lk-key="analysisGlassEnabled"/></html:label><html:label class="lk-field"><html:span>设备像素缩放</html:span><html:input type="number" min="0.5" max="2.5" step="0.05" data-lk-key="devicePixelRatio" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>玻璃类型</html:span><html:select data-lk-key="glassEffectType"><html:option value="none">无</html:option><html:option value="rough">磨砂</html:option><html:option value="liquid">液态（Zotero 中使用兼容玻璃）</html:option></html:select></html:label></html:div><html:p class="lk-hint">Zotero 基于 Gecko，无法渲染 Chromium 的 SVG 液态扭曲滤镜；启用后会使用可读性更稳定的兼容毛玻璃效果。</html:p></html:div>
+        <html:div class="lk-card"><html:h3>弹窗外观</html:h3><html:div class="lk-grid two"><html:label class="lk-field"><html:span>弹窗主题</html:span><html:select data-lk-key="tooltipThemeMode"><html:option value="auto">自动</html:option><html:option value="light">浅色</html:option><html:option value="dark">深色</html:option></html:select></html:label><html:label class="lk-field"><html:span>图案背景</html:span><html:input type="checkbox" data-lk-special="tooltipBackgroundEnabled"/></html:label><html:label class="lk-field"><html:span>液态玻璃效果</html:span><html:input type="checkbox" data-lk-key="liquidGlassEnabled"/></html:label><html:label class="lk-field"><html:span>分析窗口玻璃效果</html:span><html:input type="checkbox" data-lk-key="analysisGlassEnabled"/></html:label><html:label class="lk-field"><html:span>设备像素缩放</html:span><html:input type="number" min="0.5" max="4" step="0.1" data-lk-key="devicePixelRatio" data-lk-type="number"/></html:label><html:label class="lk-field"><html:span>玻璃类型</html:span><html:select data-lk-key="glassEffectType"><html:option value="none">无</html:option><html:option value="rough">磨砂</html:option><html:option value="liquid">液态（Zotero 中使用兼容玻璃）</html:option></html:select></html:label></html:div><html:p class="lk-hint">Zotero 基于 Gecko，无法渲染 Chromium 的 SVG 液态扭曲滤镜；启用后会使用可读性更稳定的兼容毛玻璃效果。</html:p></html:div>
+        <html:div class="lk-card"><html:h3>内置背景素材</html:h3><html:div class="lk-grid two"><html:label class="lk-field"><html:span>背景类型</html:span><html:select data-lk-special="tooltipBackgroundDefaultType"><html:option value="svg">随机 SVG 图案</html:option></html:select></html:label></html:div><html:p class="lk-hint">当前安装包完整包含 33 个 SVG 图案。原版随机图片、视频及指定素材选择依赖未打包资源或浏览器资产选择器，因此不提供无效选项。</html:p></html:div>
       </html:section>
 
       <html:section class="lk-page" data-lk-page-panel="capsules" data-title="弹窗设置 · 自定义胶囊">
-        <html:div class="lk-card"><html:h3>自定义搜索胶囊</html:h3><html:p class="lk-muted">使用 JSON 编辑原版 customCapsules 配置。URL 中可使用 {word} 和 {sentence}。</html:p><html:textarea id="lk-custom-capsules" class="lk-textarea prompt" data-lk-key="customCapsules" data-lk-type="json" placeholder='[{"name":"Google","url":"https://www.google.com/search?q={word}"}]'></html:textarea><html:div class="lk-button-row"><html:button type="button" class="lk-button" data-lk-action="format-capsules">格式化 JSON</html:button><html:button type="button" class="lk-button" data-lk-action="clear-setting" data-key="customCapsules">恢复默认</html:button></html:div></html:div>
+        <html:div class="lk-card"><html:h3>自定义搜索胶囊</html:h3><html:p class="lk-muted">使用 JSON 编辑原版 customCapsules 配置。URL 中可使用 {word} 和 {sentence}。</html:p><html:textarea id="lk-custom-capsules" class="lk-textarea prompt" data-lk-key="customCapsules" data-lk-type="json" placeholder='[{&quot;buttons&quot;:[{&quot;name&quot;:&quot;Google&quot;,&quot;url&quot;:&quot;https://www.google.com/search?q={word}&quot;,&quot;openMethod&quot;:&quot;newTab&quot;}]}]'></html:textarea><html:div class="lk-button-row"><html:button type="button" class="lk-button" data-lk-action="format-capsules">格式化 JSON</html:button><html:button type="button" class="lk-button" data-lk-action="clear-setting" data-key="customCapsules">恢复默认</html:button></html:div></html:div>
       </html:section>
 
-      <!-- EPUB -->
       <html:section class="lk-page" data-lk-page-panel="epub" data-title="EPUB 文本修复">
-        <html:div class="lk-card"><html:h3>EPUB 阅读适配</html:h3><html:p>浏览器版的 EPUB 拆分、Telegra.ph 上传和罗马注音清理是独立文件转换工具。Zotero 插件不会在设置窗口内改写你的原始电子书文件。</html:p><html:div class="lk-setting-row"><html:div><html:strong>自动清理 EPUB 文本中的软连字符</html:strong><html:span>只影响 LingKuma 在 Zotero 阅读器中获取的文本，不修改附件文件。</html:span></html:div><html:label class="lk-switch"><html:input type="checkbox" data-lk-key="epubSoftHyphenCleanup"/><html:span></html:span></html:label></html:div><html:div class="lk-setting-row"><html:div><html:strong>合并断行单词</html:strong><html:span>尝试把分页或断行造成的英文连字符重新连接。</html:span></html:div><html:label class="lk-switch"><html:input type="checkbox" data-lk-key="epubHyphenRepair"/><html:span></html:span></html:label></html:div><html:div class="lk-note">需要转换 EPUB 文件时，仍建议使用 LingKuma 原仓库中的独立工具或 Calibre。这里的设置仅作用于 Zotero 阅读器中的语言学习识别。</html:div></html:div>
+        <html:div class="lk-card">
+          <html:h3>EPUB 阅读适配</html:h3>
+          <html:p class="lk-muted">浏览器版的 EPUB 拆分、Telegra.ph 上传和罗马注音清理是独立文件转换工具。Zotero 插件不会在设置窗口内改写你的原始电子书文件。</html:p>
+          <html:div class="lk-setting-row">
+            <html:div><html:strong>自动清理 EPUB 文本中的软连字符</html:strong><html:span>只影响 LingKuma 在 Zotero 阅读器中获取的文本，不修改附件文件。</html:span></html:div>
+            <html:label class="lk-switch"><html:input type="checkbox" data-lk-key="epubSoftHyphenCleanup"/><html:span></html:span></html:label>
+          </html:div>
+          <html:div class="lk-setting-row">
+            <html:div><html:strong>合并断行单词</html:strong><html:span>尝试把分页或断行造成的英文连字符重新连接。</html:span></html:div>
+            <html:label class="lk-switch"><html:input type="checkbox" data-lk-key="epubHyphenRepair"/><html:span></html:span></html:label>
+          </html:div>
+          <html:p class="lk-hint">需要转换 EPUB 文件时，仍建议使用 LingKuma 原仓库中的独立工具或 Calibre。这里的设置仅作用于 Zotero 阅读器中的语言学习识别。</html:p>
+        </html:div>
       </html:section>
 
       <!-- About -->
       <html:section class="lk-page" data-lk-page-panel="about" data-title="关于">
-        <html:div class="lk-card"><html:h2>LingKuma for Zotero 1.0.1</html:h2><html:p>这是基于 LingKuma 1.1.0 源代码的非官方 Zotero 适配版。语言学习、高亮、AI 释义、整句翻译和弹窗逻辑来自 LingKuma；当前页面是直接嵌入 Zotero 设置窗口的原生设置面板，不再加载 iframe 或跳转浏览器网页。</html:p><html:div class="lk-button-row"><html:button type="button" class="lk-button primary" data-lk-action="open-upstream">打开 LingKuma GitHub</html:button><html:button type="button" class="lk-button" data-lk-action="diagnostic">运行诊断</html:button><html:button type="button" class="lk-button danger" data-lk-action="reset-settings">恢复默认设置</html:button></html:div><html:div class="lk-note">恢复默认设置不会删除词库、熟悉度、释义或例句。</html:div></html:div>
+        <html:div class="lk-card"><html:h2>LingKuma for Zotero 1.0.1</html:h2><html:p>这是基于 LingKuma 1.1.1 源代码的非官方 Zotero 适配版。语言学习、高亮、AI 释义、整句翻译和弹窗逻辑来自 LingKuma；当前页面是直接嵌入 Zotero 设置窗口的原生设置面板，不再加载 iframe 或跳转浏览器网页。</html:p><html:div class="lk-button-row"><html:button type="button" class="lk-button primary" data-lk-action="open-upstream">打开 LingKuma GitHub</html:button><html:button type="button" class="lk-button" data-lk-action="diagnostic">运行诊断</html:button><html:button type="button" class="lk-button danger" data-lk-action="reset-settings">恢复默认设置</html:button></html:div><html:div class="lk-note">恢复默认设置不会删除词库、熟悉度、释义或例句。</html:div></html:div>
       </html:section>
     </html:main>
   </html:div>

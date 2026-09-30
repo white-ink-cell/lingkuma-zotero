@@ -1,6 +1,7 @@
 var LingKumaPluginInstance = null;
 var LingKumaBootstrapData = null;
 var LingKumaBootstrapScope = this;
+var LingKumaLifecycleGeneration = 0;
 
 function lkBootLog(message) {
   try { Zotero.debug(`[LingKuma Bootstrap] ${message}`); } catch (_) {}
@@ -16,9 +17,12 @@ function loadIntoBootstrap(rootURI, path) {
 }
 
 async function startup({ id, version, rootURI }, reason) {
+  const generation = ++LingKumaLifecycleGeneration;
+  let instance = null;
   LingKumaBootstrapData = { id, version, rootURI };
   try {
     await Zotero.uiReadyPromise;
+    if (generation !== LingKumaLifecycleGeneration) return;
     // Bootstrapped plugin globals do not always include window timers on every
     // Zotero/Mozilla build. Borrow them from the main window when necessary.
     const mainWindow = Zotero.getMainWindow?.();
@@ -31,10 +35,19 @@ async function startup({ id, version, rootURI }, reason) {
     }
     loadIntoBootstrap(rootURI, "adapter/state.js");
     loadIntoBootstrap(rootURI, "adapter/resources.js");
+    loadIntoBootstrap(rootURI, "adapter/dictionary_catalog.js");
+    loadIntoBootstrap(rootURI, "adapter/lookup.js");
     loadIntoBootstrap(rootURI, "adapter/bridge.js");
     loadIntoBootstrap(rootURI, "adapter/main.js");
-    LingKumaPluginInstance = new LingKumaZoteroPlugin({ id, version, rootURI });
-    await LingKumaPluginInstance.start();
+    if (generation !== LingKumaLifecycleGeneration) return;
+    instance = new LingKumaZoteroPlugin({ id, version, rootURI });
+    LingKumaPluginInstance = instance;
+    await instance.start();
+    if (generation !== LingKumaLifecycleGeneration) {
+      await instance.stop();
+      if (LingKumaPluginInstance === instance) LingKumaPluginInstance = null;
+      return;
+    }
     try {
       await Zotero.PreferencePanes.register({
         pluginID: id,
@@ -46,21 +59,30 @@ async function startup({ id, version, rootURI }, reason) {
       // A missing preference pane must never stop reader integration.
       lkBootError(error, "Preference pane registration failed: ");
     }
+    if (generation !== LingKumaLifecycleGeneration) {
+      await instance.stop();
+      if (LingKumaPluginInstance === instance) LingKumaPluginInstance = null;
+      return;
+    }
     lkBootLog(`startup complete ${version}; reason=${reason}`);
   } catch (error) {
+    try { await instance?.stop(); }
+    catch (cleanupError) { lkBootError(cleanupError, "startup cleanup failed: "); }
+    if (LingKumaPluginInstance === instance) LingKumaPluginInstance = null;
+    if (generation === LingKumaLifecycleGeneration) LingKumaBootstrapData = null;
     lkBootError(error, "startup failed: ");
     throw error;
   }
 }
 
 async function shutdown({ id, version, rootURI }, reason) {
-  if (reason === APP_SHUTDOWN) return;
-  try { await LingKumaPluginInstance?.stop(); }
+  const generation = ++LingKumaLifecycleGeneration;
+  const instance = LingKumaPluginInstance;
+  try { await instance?.stop(); }
   catch (error) { lkBootError(error, "shutdown failed: "); }
-  LingKumaPluginInstance = null;
-  LingKumaBootstrapData = null;
+  if (LingKumaPluginInstance === instance) LingKumaPluginInstance = null;
+  if (generation === LingKumaLifecycleGeneration) LingKumaBootstrapData = null;
 }
-
 function install(data, reason) {
   lkBootLog(`installed ${data?.version || ""}; reason=${reason}`);
 }

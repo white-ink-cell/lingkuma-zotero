@@ -9,6 +9,278 @@
  * failures caused by cloning a nested privileged object into the reader.
  */
 
+function lkSanitizeCustomCapsules(value) {
+  if (!Array.isArray(value)) return [];
+  const methods = new Set(["newTab", "iframe", "newWindow", "sidebar"]);
+  const containers = [];
+  for (const container of value) {
+    if (!container || !Array.isArray(container.buttons)) continue;
+    const buttons = [];
+    for (const button of container.buttons) {
+      const name = String(button?.name || "").trim();
+      const urlText = String(button?.url || "").trim();
+      if (!name || /[<>\"]/.test(name) || !methods.has(button?.openMethod)) continue;
+      try {
+        const url = new URL(urlText.replace(/{word}|{sentence}/g, "sample"));
+        if (url.protocol !== "http:" && url.protocol !== "https:") continue;
+      } catch (_) {
+        continue;
+      }
+      buttons.push({ name, url: urlText, openMethod: button.openMethod });
+    }
+    if (buttons.length) containers.push({ buttons });
+  }
+  return containers;
+}
+
+const LK_DESKTOP_TTS_PROVIDERS = new Set(["local", "edge", "custom", "custom2"]);
+
+function lkStorageRequestIncludes(keys, key) {
+  if (keys === null || keys === undefined) return true;
+  if (typeof keys === "string") return keys === key;
+  if (Array.isArray(keys)) return keys.includes(key);
+  return typeof keys === "object" && Object.prototype.hasOwnProperty.call(keys, key);
+}
+
+function lkSanitizeReaderStorageResult(result, keys) {
+  if (!result || typeof result !== "object") return result;
+  if (lkStorageRequestIncludes(keys, "customCapsules")) {
+    result.customCapsules = lkSanitizeCustomCapsules(result.customCapsules);
+  }
+  if (lkStorageRequestIncludes(keys, "ttsConfig")) {
+    const config = result.ttsConfig && typeof result.ttsConfig === "object" ? { ...result.ttsConfig } : {};
+    for (const key of ["wordTTSProvider", "sentenceTTSProvider"]) {
+      if (!LK_DESKTOP_TTS_PROVIDERS.has(config[key])) config[key] = "edge";
+    }
+    result.ttsConfig = config;
+  }
+  if (lkStorageRequestIncludes(keys, "sidePanelBtn")) result.sidePanelBtn = false;
+  if (lkStorageRequestIncludes(keys, "sidePanelKey")) result.sidePanelKey = "__disabled__";
+  return result;
+}
+
+function lkSanitizeReaderStorageChanges(changes) {
+  const safeChanges = { ...(changes || {}) };
+  for (const key of ["customCapsules", "ttsConfig", "sidePanelBtn", "sidePanelKey"]) {
+    if (!safeChanges[key]) continue;
+    safeChanges[key] = {
+      ...safeChanges[key],
+      oldValue: lkSanitizeReaderStorageResult({ [key]: safeChanges[key].oldValue }, [key])[key],
+      newValue: lkSanitizeReaderStorageResult({ [key]: safeChanges[key].newValue }, [key])[key]
+    };
+  }
+  return safeChanges;
+}
+
+function lkSanitizeDictionaryStatus(value) {
+  const source = value && typeof value === "object" ? value : {};
+  const result = {};
+  for (const key of [
+    "mode", "status", "reason", "fallback", "dictionaryID", "sourceLanguage",
+    "targetLanguage", "dataSourceName", "dataSourceSnapshot", "dataLicense", "attribution"
+  ]) {
+    if (typeof source[key] === "string") result[key] = source[key];
+  }
+  const entryCount = Number(source.entryCount);
+  if (Number.isFinite(entryCount) && entryCount >= 0) result.entryCount = entryCount;
+  return result;
+}
+
+function lkSanitizeDictionaryLookup(value, request) {
+  const source = value && typeof value === "object" ? value : {};
+  const token = String(request.requestToken || "");
+  const status = ["HIT", "MISS", "UNAVAILABLE", "ERROR"].includes(source.status)
+    ? source.status : "ERROR";
+  const result = { requestToken: token, status };
+  if (status !== "HIT" || !source.entry || typeof source.entry !== "object") return result;
+  const entrySource = source.entry;
+  const meanings = [];
+  const seenMeanings = new Set();
+  for (const item of Array.isArray(entrySource.meanings) ? entrySource.meanings : []) {
+    const text = String(item || "").trim();
+    if (!text || seenMeanings.has(text)) continue;
+    seenMeanings.add(text);
+    meanings.push(text);
+    if (meanings.length === 3) break;
+  }
+  const dictionaryForm = String(entrySource.dictionaryForm || "").trim();
+  if (!meanings.length || !dictionaryForm) return { requestToken: token, status: "ERROR" };
+  const entry = {
+    surface: String(request.surface || "").trim(),
+    dictionaryForm,
+    meanings
+  };
+  const pos = [];
+  const seenPOS = new Set();
+  for (const item of Array.isArray(entrySource.pos) ? entrySource.pos : []) {
+    const text = String(item || "").trim();
+    if (!text || seenPOS.has(text)) continue;
+    seenPOS.add(text);
+    pos.push(text);
+  }
+  if (pos.length) entry.pos = pos;
+  const ipa = String(entrySource.ipa || "").trim();
+  if (ipa) entry.ipa = ipa;
+  const pronunciations = [];
+  const seenPronunciations = new Map();
+  for (const item of Array.isArray(entrySource.pronunciations) ? entrySource.pronunciations : []) {
+    if (!item || typeof item !== "object") continue;
+    const itemIPA = String(item.ipa || "").trim();
+    const region = String(item.region || "").trim();
+    if (!["US", "UK", "Other"].includes(region)) continue;
+    const pronunciation = { region };
+    if (itemIPA) pronunciation.ipa = itemIPA;
+    try {
+      const url = new URL(String(item.url || ""));
+      if (url.protocol === "https:") {
+        pronunciation.url = url.href;
+        const license = String(item.license || "").trim();
+        if (license) pronunciation.license = license;
+        try {
+          const sourceURL = new URL(String(item.sourceURL || ""));
+          if (sourceURL.protocol === "https:") pronunciation.sourceURL = sourceURL.href;
+        } catch (_) {}
+      }
+    } catch (_) {}
+    if (!itemIPA && !pronunciation.url) continue;
+    const key = itemIPA
+      ? `${region}\u0000${itemIPA}`
+      : `${region}\u0000\u0000${pronunciation.url || ""}`;
+    if (seenPronunciations.has(key)) {
+      const existing = pronunciations[seenPronunciations.get(key)];
+      if (!existing.url && pronunciation.url) Object.assign(existing, pronunciation);
+      continue;
+    }
+    seenPronunciations.set(key, pronunciations.length);
+    pronunciations.push(pronunciation);
+    if (pronunciations.length === 3) break;
+  }
+  if (pronunciations.length) entry.pronunciations = pronunciations;
+  if (entrySource.audio && typeof entrySource.audio === "object") {
+    try {
+      const url = new URL(String(entrySource.audio.url || ""));
+      if (url.protocol === "https:") {
+        entry.audio = { url: url.href };
+        const license = String(entrySource.audio.license || "").trim();
+        if (license) entry.audio.license = license;
+        const region = String(entrySource.audio.region || "").trim();
+        if (["US", "UK", "Other"].includes(region)) entry.audio.region = region;
+        try {
+          const sourceURL = new URL(String(entrySource.audio.sourceURL || ""));
+          if (sourceURL.protocol === "https:") entry.audio.sourceURL = sourceURL.href;
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+  result.entry = entry;
+  return result;
+}
+
+function lkSanitizePronunciationLookup(value, request) {
+  const source = value && typeof value === "object" ? value : {};
+  const requestToken = String(request.requestToken || "");
+  const status = ["HIT", "MISS", "UNAVAILABLE", "ERROR"].includes(source.status)
+    ? source.status : "ERROR";
+  const result = { requestToken, status };
+  if (status !== "HIT" || !source.entry || typeof source.entry !== "object") return result;
+  const entrySource = source.entry;
+  const entry = { surface: String(request.surface || "").trim() };
+  const ipa = String(entrySource.ipa || "").trim();
+  if (ipa) entry.ipa = ipa;
+  const pronunciations = [];
+  const seen = new Map();
+  for (const item of Array.isArray(entrySource.pronunciations) ? entrySource.pronunciations : []) {
+    if (!item || typeof item !== "object") continue;
+    const itemIPA = String(item.ipa || "").trim();
+    const region = String(item.region || "").trim();
+    if (!["US", "UK", "Other"].includes(region)) continue;
+    const pronunciation = { region };
+    if (itemIPA) pronunciation.ipa = itemIPA;
+    try {
+      const url = new URL(String(item.url || ""));
+      if (url.protocol === "https:") {
+        pronunciation.url = url.href;
+        const license = String(item.license || "").trim();
+        if (license) pronunciation.license = license;
+        try {
+          const sourceURL = new URL(String(item.sourceURL || ""));
+          if (sourceURL.protocol === "https:") pronunciation.sourceURL = sourceURL.href;
+        } catch (_) {}
+      }
+    } catch (_) {}
+    if (!itemIPA && !pronunciation.url) continue;
+    const key = itemIPA
+      ? `${region}\u0000${itemIPA}`
+      : `${region}\u0000\u0000${pronunciation.url || ""}`;
+    if (seen.has(key)) {
+      const existing = pronunciations[seen.get(key)];
+      if (!existing.url && pronunciation.url) Object.assign(existing, pronunciation);
+      continue;
+    }
+    seen.set(key, pronunciations.length);
+    pronunciations.push(pronunciation);
+    if (pronunciations.length === 3) break;
+  }
+  if (pronunciations.length) entry.pronunciations = pronunciations;
+  if (entrySource.audio && typeof entrySource.audio === "object") {
+    try {
+      const url = new URL(String(entrySource.audio.url || ""));
+      if (url.protocol === "https:") {
+        entry.audio = { url: url.href };
+        const license = String(entrySource.audio.license || "").trim();
+        if (license) entry.audio.license = license;
+        const region = String(entrySource.audio.region || "").trim();
+        if (["US", "UK", "Other"].includes(region)) entry.audio.region = region;
+        try {
+          const sourceURL = new URL(String(entrySource.audio.sourceURL || ""));
+          if (sourceURL.protocol === "https:") entry.audio.sourceURL = sourceURL.href;
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+  if (!entry.ipa && !entry.pronunciations && !entry.audio) return { requestToken, status: "ERROR" };
+  result.entry = entry;
+  return result;
+}
+
+function lkSanitizeAIPronunciationLookup(value, request) {
+  const source = value && typeof value === "object" ? value : {};
+  const requestToken = String(request.requestToken || "");
+  const status = ["HIT", "MISS", "UNAVAILABLE", "ERROR"].includes(source.status)
+    ? source.status : "ERROR";
+  if (status !== "HIT") return { requestToken, status };
+  const sourceRecords = Array.isArray(source.entry?.pronunciations)
+    ? source.entry.pronunciations
+    : [];
+  const pronunciations = [];
+  for (const region of ["US", "UK"]) {
+    const record = sourceRecords.find(item => item && item.region === region);
+    const ipa = String(record?.ipa || "").trim();
+    const valid = ipa.length <= 160 && (
+      /^\/[^/\r\n]{1,156}\/$/u.test(ipa)
+      || /^\[[^\]\r\n]{1,156}\]$/u.test(ipa)
+    );
+    if (!valid) return { requestToken, status: "ERROR" };
+    pronunciations.push({ region, ipa });
+  }
+  return {
+    requestToken,
+    status: "HIT",
+    entry: { surface: String(request.surface || "").trim(), pronunciations }
+  };
+}
+
+function lkSanitizeQuickContext(value, request) {
+  const source = value && typeof value === "object" ? value : {};
+  const requestToken = String(request.requestToken || "");
+  const status = ["HIT", "MISS", "ERROR"].includes(source.status)
+    ? source.status : "ERROR";
+  if (status !== "HIT") return { requestToken, status };
+  const sentenceTranslation = String(source.sentenceTranslation || "").trim();
+  const contextualMeaning = String(source.contextualMeaning || "").trim();
+  if (!sentenceTranslation || !contextualMeaning) return { requestToken, status: "ERROR" };
+  return { requestToken, status, sentenceTranslation, contextualMeaning };
+}
 class LingKumaMessageHost {
   constructor({ state, plugin, rootURI, pluginID }) {
     this.state = state;
@@ -17,17 +289,23 @@ class LingKumaMessageHost {
     this.pluginID = pluginID;
     this.contexts = new Set();
     this.nextContextID = 1;
-    this.state.addStorageListener((changes, area) => {
+    this.destroyed = false;
+    this._storageListener = (changes, area) => {
       // WebExtension storage.onChanged is asynchronous relative to storage.set.
       // Do not let a privileged synchronous state mutation race upstream code.
+      const safeChanges = lkSanitizeReaderStorageChanges(changes);
       this._scheduleTask(() => {
         for (const context of Array.from(this.contexts)) {
           if (context.destroyed) continue;
-          try { context.dispatchStorageChanged(changes, area); }
+          try { context.dispatchStorageChanged(safeChanges, area); }
           catch (error) { try { Zotero.logError(error); } catch (_) {} }
+          if (safeChanges.translationConfig) {
+            this.plugin?.ensureDefaultDictionaryForContext(context);
+          }
         }
       });
-    });
+    };
+    this.state.addStorageListener(this._storageListener);
   }
 
   debug(message) {
@@ -40,6 +318,19 @@ class LingKumaMessageHost {
 
   unregisterContext(context) {
     this.contexts.delete(context);
+  }
+
+  destroy() {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    for (const context of Array.from(this.contexts)) {
+      try { context.destroy(); } catch (_) {}
+    }
+    this.contexts.clear();
+    try { this.state?.removeStorageListener?.(this._storageListener); } catch (_) {}
+    this._storageListener = null;
+    this.plugin = null;
+    this.state = null;
   }
 
   contextsForTab(tabId) {
@@ -251,6 +542,59 @@ class LingKumaMessageHost {
         return { success: true, restored: state.restoreWords(message.data || {}, false) };
       case "mergeDatabase":
         return { success: true, merged: state.restoreWords(message.data || {}, true), skipped: 0 };
+      case "lookupDictionary": {
+        const request = {
+          requestToken: String(message.requestToken || ""),
+          surface: String(message.surface || ""),
+          sourceLanguage: String(message.sourceLanguage || ""),
+          targetLanguage: String(message.targetLanguage || "")
+        };
+        const result = await this.plugin?.lookup?.lookupDictionary?.(request)
+          || { requestToken: request.requestToken, status: "UNAVAILABLE" };
+        return lkSanitizeDictionaryLookup(result, request);
+      }
+      case "lookupPronunciation": {
+        const request = {
+          requestToken: String(message.requestToken || ""),
+          surface: String(message.surface || ""),
+          sourceLanguage: String(message.sourceLanguage || "")
+        };
+        const result = await this.plugin?.lookup?.lookupPronunciation?.(request)
+          || { requestToken: request.requestToken, status: "UNAVAILABLE" };
+        return lkSanitizePronunciationLookup(result, request);
+      }
+      case "lookupAIPronunciation": {
+        const request = {
+          requestToken: String(message.requestToken || ""),
+          surface: String(message.surface || ""),
+          sourceLanguage: String(message.sourceLanguage || "")
+        };
+        const result = await this.plugin?.lookup?.lookupAIPronunciation?.(request)
+          || { requestToken: request.requestToken, status: "UNAVAILABLE" };
+        return lkSanitizeAIPronunciationLookup(result, request);
+      }
+      case "lookupQuickContext": {
+        const request = {
+          requestToken: String(message.requestToken || ""),
+          surface: String(message.surface || ""),
+          sentence: String(message.sentence || ""),
+          sourceLanguage: String(message.sourceLanguage || ""),
+          targetLanguage: String(message.targetLanguage || "")
+        };
+        if (Number.isInteger(message.surfaceStart) && message.surfaceStart >= 0) {
+          request.surfaceStart = message.surfaceStart;
+        }
+        const result = await this.plugin?.lookup?.lookupQuickContext?.(request)
+          || { requestToken: request.requestToken, status: "ERROR" };
+        return lkSanitizeQuickContext(result, request);
+      }
+      case "getDictionaryStatus": {
+        const status = await this.plugin?.lookup?.getDictionaryStatus?.({
+          sourceLanguage: String(message.sourceLanguage || ""),
+          targetLanguage: String(message.targetLanguage || "")
+        }) || { mode: "default", status: "UNAVAILABLE", reason: "LOOKUP_NOT_READY" };
+        return lkSanitizeDictionaryStatus(status);
+      }
       case "getAIConfig":
         return { config: state.getAIConfigForContent() };
       case "translateText": {
@@ -293,11 +637,19 @@ class LingKumaMessageHost {
         return { success: true };
       case "openSidebar":
       case "showSidebar":
+        return { success: false, unsupported: true };
       case "openCustomCapsuleSidebar":
       case "openCustomCapsuleTab":
-      case "openCustomCapsuleWindow":
-        this.plugin.openVocabularyManager();
-        return { success: true };
+      case "openCustomCapsuleWindow": {
+        let url;
+        try { url = new URL(String(message.url || "")); }
+        catch (_) { throw new Error("Custom capsule URL must use http or https"); }
+        if (url.protocol !== "http:" && url.protocol !== "https:") {
+          throw new Error("Custom capsule URL must use http or https");
+        }
+        Zotero.launchURL(url.href);
+        return { success: true, url: url.href };
+      }
       case "refreshAfdianSubscription":
         return { success: true, active: false };
       case "streamUpdate":
@@ -387,7 +739,7 @@ class LingKumaContentContext {
       if (asksForAIConfig && result && typeof result === "object") {
         result.aiConfig = context.host.state.getAIConfigForStorage();
       }
-      return JSON.stringify(result);
+      return JSON.stringify(lkSanitizeReaderStorageResult(result, keys));
     });
 
     exportFn("__lkHostStorageSet", valuesJSON => {
@@ -786,7 +1138,29 @@ class LingKumaContentContext {
     } catch (_) {}
   }
 
+  async playEdgeTTS(options) {
+    if (!this._isAlive()) throw new Error("LingKuma reader context is no longer available");
+    const payload = JSON.stringify(options || {});
+    const result = this._eval(`globalThis.__LINGKUMA_ZOTERO_EDGE_TTS__?.play(${payload})`);
+    if (!result || typeof result.then !== "function") {
+      throw new Error("LingKuma Edge TTS bridge is unavailable");
+    }
+    return await result;
+  }
+
+  stopEdgeTTS() {
+    try { this._eval(`globalThis.__LINGKUMA_ZOTERO_EDGE_TTS__?.stop()`); } catch (_) {}
+  }
+
   destroy() {
+    try { this.dispatchRuntimeMessage({ action: "teardownHighlightRuntime" }); } catch (_) {}
+    try { this.dispatchRuntimeMessage({ action: "toggleBionic", isEnabled: false }); } catch (_) {}
+    try { this._eval(`document.getElementById("reading-ruler-container")?.remove();`); } catch (_) {}
+    try { this.dispatchRuntimeMessage({ action: "togglePosHighlight", enabled: false }); } catch (_) {}
+    try { this._eval(`if (typeof clearAllPopupsAndWindows === "function") clearAllPopupsAndWindows();`); } catch (_) {}
+    try { this._eval(`globalThis.__LINGKUMA_ZOTERO_WORD_EXPLOSION__?.cleanup?.();`); } catch (_) {}
+    try { this._eval(`globalThis.__LINGKUMA_ZOTERO_LOOKUP_UI__?.cleanup?.();`); } catch (_) {}
+    try { this._eval(`globalThis.__LINGKUMA_ZOTERO_EDGE_TTS__?.cleanup?.();`); } catch (_) {}
     try { this._eval(`globalThis.__LINGKUMA_SENTENCE_PANEL_PATCH__?.cleanup?.();`); } catch (_) {}
     try { this._eval(`globalThis.__LINGKUMA_ZOTERO_LANGUAGE_BRIDGE__?.cleanup?.();`); } catch (_) {}
     try { this._eval(`globalThis.__LINGKUMA_ZOTERO_THEME_EVENT_BRIDGE__?.cleanup?.();`); } catch (_) {}

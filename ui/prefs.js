@@ -74,7 +74,6 @@
   "自建服务器": "Self-hosted server",
   "保存自建 LingKuma 服务地址。": "Save a self-hosted LingKuma service URL.",
   "服务器 URL": "Server URL",
-  "Zotero 版当前可直接使用下方 WebDAV 完成跨设备词库与设置备份。Cloud Database 登录和付费账号验证仍属于浏览器扩展专属服务。": "The Zotero port can use WebDAV below for cross-device vocabulary and settings backups. Cloud Database login and paid-account verification remain browser-extension-only services.",
   "WebDAV 配置": "WebDAV configuration",
   "WebDAV 目录 URL": "WebDAV folder URL",
   "账号": "Username",
@@ -109,13 +108,6 @@
   "开始导入": "Start import",
   "清空输入": "Clear input",
   "备份": "Backup",
-  "词库与设置备份": "Vocabulary & settings backup",
-  "备份内容包括词汇状态、释义、例句、标签及全部 Zotero 适配设置。": "The backup includes word status, explanations, sentences, tags, and all Zotero adapter settings.",
-  "复制完整备份 JSON": "Copy full backup JSON",
-  "仅复制设置 JSON": "Copy settings JSON only",
-  "点击上方按钮生成备份；也可以粘贴备份后恢复。": "Use the buttons above to create a backup, or paste a backup here to restore it.",
-  "恢复并合并": "Restore & merge",
-  "恢复并替换": "Restore & replace",
   "API 基本": "API basics",
   "API 配置 · 基本设置": "API configuration · Basic settings",
   "AI 通道": "AI channel",
@@ -240,7 +232,7 @@
   "合并断行单词": "Repair line-broken words",
   "尝试把分页或断行造成的英文连字符重新连接。": "Try to reconnect English words split by page or line-break hyphenation.",
   "需要转换 EPUB 文件时，仍建议使用 LingKuma 原仓库中的独立工具或 Calibre。这里的设置仅作用于 Zotero 阅读器中的语言学习识别。": "For EPUB file conversion, use the standalone tools in the upstream LingKuma repository or Calibre. These settings affect only language-learning recognition inside Zotero.",
-  "这是基于 LingKuma 1.1.0 源代码的非官方 Zotero 适配版。语言学习、高亮、AI 释义、整句翻译和弹窗逻辑来自 LingKuma；当前页面是直接嵌入 Zotero 设置窗口的原生设置面板，不再加载 iframe 或跳转浏览器网页。": "This is an unofficial Zotero port based on LingKuma 1.1.0. Language learning, highlighting, AI explanations, sentence translation, and popup logic come from LingKuma; this page is a native Zotero settings panel rather than an iframe or browser page.",
+  "这是基于 LingKuma 1.1.1 源代码的非官方 Zotero 适配版。语言学习、高亮、AI 释义、整句翻译和弹窗逻辑来自 LingKuma；当前页面是直接嵌入 Zotero 设置窗口的原生设置面板，不再加载 iframe 或跳转浏览器网页。": "This is an unofficial Zotero port based on LingKuma 1.1.1. Language learning, highlighting, AI explanations, sentence translation, and popup logic come from LingKuma; this page is a native Zotero settings panel rather than an iframe or browser page.",
   "打开 LingKuma GitHub": "Open LingKuma GitHub",
   "运行诊断": "Run diagnostics",
   "恢复默认设置": "Restore default settings",
@@ -281,6 +273,7 @@
     applyTimer: null,
     wordPage: 1,
     wordRows: [],
+    aiProfileCounter: 0,
 
     interfaceLanguage() {
       const selector = document.getElementById("lk-ui-language");
@@ -390,6 +383,7 @@
       this.refreshWordSummary();
       this.renderWordList();
       this.renderStatistics();
+      await this.refreshDictionaryStatus();
       this.status(
         plugin.state.storage.aiConfig?.apiBaseURL
           ? "设置直接保存在 Zotero 中；当前使用自定义 AI。"
@@ -426,6 +420,7 @@
       if (page === "word-list") this.renderWordList();
       if (page === "statistics") this.renderStatistics();
       if (page === "word-operations") this.refreshWordSummary();
+      if (page === "dictionary") this.refreshDictionaryStatus();
       document.querySelector(".lk-main")?.scrollTo({ top: 0, behavior: "instant" });
     },
 
@@ -435,8 +430,12 @@
         const eventName = ["text", "password", "number", "search", "range"].includes(control.type) || control.tagName === "TEXTAREA"
           ? "input"
           : "change";
-        control.addEventListener(eventName, () => this.scheduleSave());
-        if (eventName !== "change") control.addEventListener("change", () => this.scheduleSave());
+        const markChanged = () => {
+          control.dataset.lkDirty = "true";
+          this.scheduleSave();
+        };
+        control.addEventListener(eventName, markChanged);
+        if (eventName !== "change") control.addEventListener("change", markChanged);
       }
       document.getElementById("lk-import-file")?.addEventListener("change", event => this.readImportFile(event));
       document.getElementById("lk-word-search")?.addEventListener("input", () => {
@@ -453,6 +452,19 @@
       });
       document.getElementById("lk-ui-language")?.addEventListener("change", () => {
         this.applyInterfaceLanguage();
+      });
+      for (const control of document.querySelectorAll("[data-lk-profile-field]")) {
+        const eventName = ["text", "password", "number"].includes(control.type) || control.tagName === "TEXTAREA"
+          ? "input"
+          : "change";
+        control.addEventListener(eventName, () => this.scheduleSave());
+        if (eventName !== "change") control.addEventListener("change", () => this.scheduleSave());
+      }
+      document.getElementById("lk-ai-profile-select")?.addEventListener("change", event => {
+        this.captureActiveAIProfile();
+        this.state().storage.customApiProfiles.activeProfileId = event.currentTarget.value;
+        this.renderAIProfiles();
+        this.scheduleSave();
       });
     },
 
@@ -476,14 +488,12 @@
         case "diagnostic": return this.plugin()?.showDiagnostics(Zotero.getMainWindow());
         case "open-vocabulary": return this.plugin()?.openVocabularyManager(Zotero.getMainWindow());
         case "open-upstream": return Zotero.launchURL("https://github.com/lingkuma/LingKuma");
-        case "open-afdian": return Zotero.launchURL("https://afdian.com/");
         case "reset-minimized": return this.resetMinimized();
         case "clear-words": return this.clearWords();
         case "trim-sentences": return this.trimSentences();
         case "clear-import": document.getElementById("lk-import-text").value = ""; return;
         case "import-words": return this.importWords();
-        case "copy-full-backup": return this.copyBackup(false);
-        case "copy-settings-backup": return this.copyBackup(true);
+        case "copy-learning-backup": return this.copyBackup();
         case "restore-merge": return this.restoreBackup(true);
         case "restore-replace": return this.restoreBackup(false);
         case "webdav-test": return this.webdavTest();
@@ -495,12 +505,71 @@
         case "word-prev": this.wordPage = Math.max(1, this.wordPage - 1); return this.renderWordList();
         case "word-next": this.wordPage += 1; return this.renderWordList();
         case "format-capsules": return this.formatCapsules();
+        case "ai-profile-add": return this.addAIProfile(false);
+        case "ai-profile-copy": return this.addAIProfile(true);
+        case "ai-profile-delete": return this.deleteAIProfile();
         case "test-local-tts": return this.testLocalTTS();
+        case "dictionary-default": return this.selectDictionaryMode("default");
+        case "dictionary-custom": return this.selectDictionaryMode("custom");
+        case "dictionary-import": return this.importDictionary();
+        case "dictionary-refresh": return this.refreshDictionaryStatus();
         case "reset-settings": return this.resetSettings();
         default: return undefined;
       }
     },
 
+    async refreshDictionaryStatus() {
+      const node = document.getElementById("lk-dictionary-status");
+      const lookup = this.plugin()?.lookup;
+      if (!node || !lookup) return null;
+      try {
+        const result = await lookup.getDictionaryStatus();
+        const pair = [result?.sourceLanguage, result?.targetLanguage].filter(Boolean).join(" → ");
+        node.textContent = [
+          String(result?.mode || "default").toUpperCase(),
+          String(result?.status || "UNAVAILABLE").toUpperCase(),
+          result?.dictionaryID,
+          pair,
+          result?.reason,
+        ].filter(Boolean).join(" · ");
+        node.dataset.state = result?.status === "READY" ? "saved" : "warning";
+        return result;
+      } catch (error) {
+        node.textContent = `Dictionary status unavailable · ${error?.message || error}`;
+        node.dataset.state = "error";
+        return null;
+      }
+    },
+
+    async selectDictionaryMode(mode) {
+      const plugin = this.plugin();
+      if (!plugin?.lookup) throw new Error("Dictionary service is not ready");
+      plugin.lookup.selectDictionary(mode);
+      await plugin.state.save();
+      const result = await this.refreshDictionaryStatus();
+      this.status(`Dictionary mode: ${mode}`, result?.status === "READY" ? "saved" : "warning");
+    },
+
+    async pickDictionaryFile() {
+      const Ci = Components.interfaces;
+      const picker = Components.classes["@mozilla.org/filepicker;1"].createInstance(Ci.nsIFilePicker);
+      picker.init(window.browsingContext || window, "Import LingKuma dictionary", picker.modeOpen);
+      picker.appendFilter("LingKuma Dictionary (*.lkdict)", "*.lkdict");
+      const result = await new Promise(resolve => picker.open(resolve));
+      return result === picker.returnOK ? picker.file.path : null;
+    },
+
+    async importDictionary() {
+      const plugin = this.plugin();
+      if (!plugin?.lookup) throw new Error("Dictionary service is not ready");
+      const filePath = await this.pickDictionaryFile();
+      if (!filePath) return;
+      if (!String(filePath).toLowerCase().endsWith(".lkdict")) throw new Error("Select a .lkdict file");
+      await plugin.lookup.importCustomDictionary(filePath);
+      await plugin.state.save();
+      const result = await this.refreshDictionaryStatus();
+      this.status("Custom dictionary imported.", result?.status === "READY" ? "saved" : "warning");
+    },
     loadControls() {
       const storage = this.state()?.storage || {};
       for (const control of document.querySelectorAll("[data-lk-key]")) {
@@ -523,20 +592,203 @@
       }
       const bg = document.querySelector('[data-lk-special="tooltipBackgroundEnabled"]');
       if (bg) bg.checked = storage.tooltipBackground?.enabled !== false;
+      const bgType = document.querySelector('[data-lk-special="tooltipBackgroundDefaultType"]');
+      if (bgType) bgType.value = "svg";
+      this.renderAIProfiles();
+    },
+
+    normalizedAIProfiles() {
+      const state = this.state();
+      const raw = state.storage.customApiProfiles && typeof state.storage.customApiProfiles === "object"
+        ? state.storage.customApiProfiles
+        : {};
+      let profiles = Array.isArray(raw.profiles)
+        ? raw.profiles.slice(0, 20).map((profile, index) => this.normalizeAIProfile(profile, index))
+        : [];
+      if (!profiles.length) {
+        profiles = [this.normalizeAIProfile({
+          id: "default",
+          name: "Default",
+          ...(state.storage.aiConfig || {}),
+          enablePolling: true,
+        }, 0)];
+      }
+      const seen = new Set();
+      profiles = profiles.map(profile => {
+        const base = profile.id;
+        let id = base;
+        let suffix = 2;
+        while (seen.has(id)) id = `${base}-${suffix++}`;
+        seen.add(id);
+        return { ...profile, id };
+      });
+      const requested = String(raw.activeProfileId || "");
+      const normalized = {
+        profiles,
+        activeProfileId: profiles.some(profile => profile.id === requested) ? requested : profiles[0].id,
+      };
+      state.storage.customApiProfiles = normalized;
+      return normalized;
+    },
+
+    normalizeAIProfile(raw, index = 0) {
+      const profile = raw && typeof raw === "object" ? raw : {};
+      const temperature = Number(profile.apiTemperature);
+      return {
+        id: String(profile.id || `profile-${index + 1}`),
+        name: String(profile.name || `Profile ${index + 1}`),
+        apiBaseURL: String(profile.apiBaseURL || ""),
+        apiKey: String(profile.apiKey || ""),
+        apiModel: String(profile.apiModel || ""),
+        apiTemperature: Number.isFinite(temperature) ? Math.max(0, Math.min(2, temperature)) : 1,
+        enablePolling: profile.enablePolling === true,
+        excludeTemperature: profile.excludeTemperature === true,
+        customRequestBody: String(profile.customRequestBody || "").slice(0, 32768),
+      };
+    },
+
+    activeAIProfile() {
+      const container = this.normalizedAIProfiles();
+      return container.profiles.find(profile => profile.id === container.activeProfileId) || container.profiles[0];
+    },
+
+    captureActiveAIProfile() {
+      const profile = this.activeAIProfile();
+      if (!profile) return null;
+      for (const control of document.querySelectorAll("[data-lk-profile-field]")) {
+        profile[control.dataset.lkProfileField] = this.readControl(control);
+      }
+      profile.name = String(profile.name || "Profile").trim() || "Profile";
+      return profile;
+    },
+
+    renderAIProfiles() {
+      const container = this.normalizedAIProfiles();
+      const select = document.getElementById("lk-ai-profile-select");
+      if (select) {
+        select.textContent = "";
+        for (const profile of container.profiles) {
+          const option = document.createElementNS(HTML_NS, "option");
+          option.value = profile.id;
+          option.textContent = profile.name || profile.id;
+          select.appendChild(option);
+        }
+        select.value = container.activeProfileId;
+      }
+      const profile = this.activeAIProfile();
+      for (const control of document.querySelectorAll("[data-lk-profile-field]")) {
+        const value = profile?.[control.dataset.lkProfileField];
+        if (control.type === "checkbox") control.checked = value === true;
+        else control.value = value === undefined || value === null ? "" : String(value);
+      }
+    },
+
+    newAIProfileID(container) {
+      const used = new Set(container.profiles.map(profile => profile.id));
+      let id;
+      do { id = `profile-${Date.now()}-${++this.aiProfileCounter}`; } while (used.has(id));
+      return id;
+    },
+
+    async addAIProfile(copyCurrent) {
+      this.captureActiveAIProfile();
+      const container = this.normalizedAIProfiles();
+      if (container.profiles.length >= 20) throw new Error("AI profile limit reached (20)");
+      const source = copyCurrent
+        ? (container.profiles.find(profile => profile.id === container.activeProfileId) || container.profiles[0])
+        : {};
+      const id = this.newAIProfileID(container);
+      const profile = this.normalizeAIProfile({
+        ...clone(source), id,
+        name: copyCurrent ? `${source?.name || "Profile"} copy` : `Profile ${container.profiles.length + 1}`,
+      }, container.profiles.length);
+      container.profiles.push(profile);
+      container.activeProfileId = id;
+      this.renderAIProfiles();
+      return this.saveSettings(true);
+    },
+
+    async deleteAIProfile() {
+      this.captureActiveAIProfile();
+      const container = this.normalizedAIProfiles();
+      if (container.profiles.length === 1) throw new Error("At least one AI profile is required");
+      const index = Math.max(0, container.profiles.findIndex(profile => profile.id === container.activeProfileId));
+      container.profiles.splice(index, 1);
+      container.activeProfileId = container.profiles[Math.min(index, container.profiles.length - 1)].id;
+      this.renderAIProfiles();
+      return this.saveSettings(true);
     },
 
     readControl(control) {
       if (control.type === "checkbox") return control.checked;
       if (control.dataset.lkType === "number") {
-        const value = Number(control.value);
-        return Number.isFinite(value) ? value : 0;
+        let value = Number(control.value);
+        if (!Number.isFinite(value)) value = 0;
+        const min = Number(control.min);
+        const max = Number(control.max);
+        if (control.min !== "" && Number.isFinite(min)) value = Math.max(min, value);
+        if (control.max !== "" && Number.isFinite(max)) value = Math.min(max, value);
+        return value;
       }
       if (control.dataset.lkType === "json") {
         const text = control.value.trim();
         if (!text) return [];
-        return JSON.parse(text);
+        const parsed = JSON.parse(text);
+        return control.dataset.lkKey === "customCapsules" && control.dataset.lkDirty === "true" ? this.validateCustomCapsules(parsed) : parsed;
       }
       return control.value;
+    },
+
+    normalizeShortcut(value, allowNamed = true) {
+      const raw = String(value ?? "");
+      if (raw === " " || raw.trim().toLowerCase() === "space") return " ";
+      const key = raw.trim().toLowerCase();
+      const namedKeys = new Set(["tab", "capslock", "enter", "escape", "backspace", "delete", "arrowup", "arrowdown", "arrowleft", "arrowright"]);
+      if (Array.from(key).length !== 1 || /\s/.test(key)) {
+        if (!allowNamed || !namedKeys.has(key)) throw new Error(`Invalid shortcut: ${value}`);
+      }
+      return key;
+    },
+
+    validateShortcutSettings(values, sidePanelKey = "r") {
+      const entries = [];
+      for (const key of ["wordQueryKey", "copySentenceKey", "analysisWindowKey", "sentenceExplosionKey"]) {
+        if (Object.prototype.hasOwnProperty.call(values, key)) entries.push([key, values, key, true]);
+      }
+      if (values.wordStatusKeys) {
+        for (const key of ["0", "1", "2", "3", "4", "5", "toggle", "addAITranslation", "closeTooltip"]) {
+          if (Object.prototype.hasOwnProperty.call(values.wordStatusKeys, key)) {
+            const allowNamed = key === "addAITranslation" || key === "closeTooltip";
+            entries.push([`wordStatusKeys.${key}`, values.wordStatusKeys, key, allowNamed]);
+          }
+        }
+      }
+      const reservedSidePanelKey = String(sidePanelKey || "r").trim().toLowerCase();
+      const used = new Map([[reservedSidePanelKey, "sidePanelKey (reserved on desktop)"]]);
+      for (const [label, owner, key, allowNamed] of entries) {
+        const normalized = this.normalizeShortcut(owner[key], allowNamed);
+        if (used.has(normalized)) throw new Error(`Shortcut conflict: ${label} and ${used.get(normalized)}`);
+        owner[key] = normalized;
+        used.set(normalized, label);
+      }
+    },
+
+    validateCustomCapsules(value) {
+      if (!Array.isArray(value)) throw new Error("customCapsules must be an array");
+      const methods = new Set(["newTab", "iframe", "newWindow", "sidebar"]);
+      for (const [containerIndex, container] of value.entries()) {
+        if (!container || !Array.isArray(container.buttons)) throw new Error(`customCapsules[${containerIndex}].buttons must be an array`);
+        for (const [buttonIndex, button] of container.buttons.entries()) {
+          const label = `customCapsules[${containerIndex}].buttons[${buttonIndex}]`;
+          if (!button || !String(button.name || "").trim()) throw new Error(`${label}.name is required`);
+          if (/[<>"]/.test(String(button.name))) throw new Error(`${label}.name must use safe plain text`);
+          if (String(button.icon || "").trim()) throw new Error(`${label}.icon is unsupported on desktop`);
+          if (!methods.has(button.openMethod)) throw new Error(`${label}.openMethod is invalid`);
+          const url = new URL(String(button.url || "").replace(/{word}|{sentence}/g, "sample"));
+          if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error(`${label}.url must use http or https`);
+        }
+      }
+      return value;
     },
 
     collectSettings() {
@@ -547,17 +799,46 @@
       }
       for (const control of document.querySelectorAll("[data-lk-object]")) {
         const objectName = control.dataset.lkObject;
-        values[objectName] ||= clone(plugin.state.storage[objectName] || {});
+        const persisted = plugin.state.storage[objectName] || {};
+        values[objectName] ||= clone(persisted);
+        if (objectName === "ttsConfig"
+          && ["wordTTSProvider", "sentenceTTSProvider"].includes(control.dataset.lkSubkey)
+          && !["local", "edge", "custom", "custom2"].includes(control.value)
+          && !["local", "edge", "custom", "custom2"].includes(persisted[control.dataset.lkSubkey])) continue;
         values[objectName][control.dataset.lkSubkey] = this.readControl(control);
+      }
+      for (const [colorKey, opacityKey] of [
+        ["wordExplosionHighlightColor", "wordExplosionHighlightOpacity"],
+        ["wordExplosionUnderlineColor", "wordExplosionUnderlineOpacity"],
+        ["posHighlightVerbBackgroundColor", "posHighlightVerbBackgroundOpacity"],
+        ["posHighlightPrepositionBackgroundColor", "posHighlightPrepositionBackgroundOpacity"],
+      ]) {
+        if (!Object.prototype.hasOwnProperty.call(values, opacityKey)) continue;
+        const color = String(values[colorKey] ?? plugin.state.storage[colorKey] ?? "");
+        const match = color.match(/^(#[0-9a-f]{6})(?:[0-9a-f]{2})?$/i);
+        if (!match) continue;
+        const opacity = Math.max(0, Math.min(100, Number(values[opacityKey])));
+        const alpha = Math.round(opacity * 2.55).toString(16).padStart(2, "0");
+        values[colorKey] = `${match[1]}${alpha}`;
       }
       const bg = document.querySelector('[data-lk-special="tooltipBackgroundEnabled"]');
       if (bg) {
+        const bgType = document.querySelector('[data-lk-special="tooltipBackgroundDefaultType"]');
+        const defaultType = bgType?.value === "svg" ? bgType.value : "svg";
         values.tooltipBackground = {
           ...(plugin.state.storage.tooltipBackground || {}),
           enabled: bg.checked,
           useCustom: false,
-          defaultType: plugin.state.storage.tooltipBackground?.defaultType || "svg"
+          defaultType
         };
+      }
+      const activeProfile = this.captureActiveAIProfile();
+      values.customApiProfiles = clone(this.normalizedAIProfiles());
+      if (activeProfile) {
+        values.aiConfig ||= clone(plugin.state.storage.aiConfig || {});
+        for (const key of ["apiBaseURL", "apiKey", "apiModel", "apiTemperature"]) {
+          values.aiConfig[key] = activeProfile[key];
+        }
       }
       // In Zotero the true Chromium SVG liquid distortion is unavailable.
       // Do not allow the old "liquid enabled + no material" combination,
@@ -567,13 +848,7 @@
         const materialControl = document.querySelector('[data-lk-key="glassEffectType"]');
         if (materialControl) materialControl.value = "rough";
       }
-      values.cloudConfig = {
-        ...(plugin.state.storage.cloudConfig || {}),
-        cloudDbEnabled: values.cloudDbEnabled === true,
-        cloudDualWrite: values.cloudDualWrite === true,
-        cloudSelfHosted: values.cloudSelfHosted === true,
-        serverUrl: values.cloudServerUrl || ""
-      };
+      this.validateShortcutSettings(values, plugin.state.storage.sidePanelKey || "r");
       return values;
     },
 
@@ -679,14 +954,25 @@
       this.status(`已读取文件：${file.name}`, "saved");
     },
 
-    parseImportText(text, status) {
+    parseImportText(text, status, language = "en") {
       const trimmed = String(text || "").trim();
       if (!trimmed) throw new Error("请先选择文件或粘贴词汇数据");
       try { return JSON.parse(trimmed); }
       catch (_) {
         const words = trimmed.split(/[\r\n,;]+/).map(item => item.trim()).filter(Boolean);
         if (!words.length) throw new Error("没有识别到可导入的单词");
-        return words.map(word => ({ word, term: word, status: String(status || 5) }));
+        const normalizedLanguage = String(language || "").trim().toLowerCase();
+        if (!/^[a-z]{2}$/.test(normalizedLanguage)) throw new Error("Custom import language must be a two-letter ISO 639-1 code");
+        const normalizedStatus = String(status ?? "5");
+        if (!/^[0-5]$/.test(normalizedStatus)) throw new Error("Import status must be between 0 and 5");
+        const changedAt = new Date().toISOString();
+        return words.map(word => ({
+          word,
+          term: word,
+          language: normalizedLanguage,
+          status: normalizedStatus,
+          statusHistory: { [normalizedStatus]: changedAt },
+        }));
       }
     },
 
@@ -694,7 +980,11 @@
       const text = document.getElementById("lk-import-text")?.value || "";
       const mode = document.getElementById("lk-import-mode")?.value || "merge";
       const status = document.getElementById("lk-import-status")?.value || "5";
-      const parsed = this.parseImportText(text, status);
+      const selectedLanguage = document.getElementById("lk-import-language")?.value || "en";
+      const language = selectedLanguage === "custom"
+        ? document.getElementById("lk-import-custom-language")?.value
+        : selectedLanguage;
+      const parsed = this.parseImportText(text, status, language);
       const count = this.state().importLingKuma(parsed, mode === "merge");
       await this.state().save();
       this.refreshWordSummary();
@@ -717,23 +1007,19 @@
       throw new Error("当前系统不允许写入剪贴板");
     },
 
-    async copyBackup(settingsOnly) {
-      const payload = settingsOnly
-        ? { format: "lingkuma-zotero-settings", version: 10, exportedAt: new Date().toISOString(), storage: clone(this.state().storage) }
-        : this.state().exportData();
+    async copyBackup() {
+      const payload = this.state().exportData();
       const text = JSON.stringify(payload, null, 2);
       document.getElementById("lk-backup-text").value = text;
       await this.copyText(text);
-      this.status(settingsOnly ? "设置备份已复制到剪贴板。" : "完整备份已复制到剪贴板。", "saved");
+      this.status("Learning-data backup copied to the clipboard.", "saved");
     },
 
     async restoreBackup(merge) {
       const text = document.getElementById("lk-backup-text")?.value.trim();
       if (!text) throw new Error("请先粘贴备份 JSON");
       const parsed = JSON.parse(text);
-      if (!merge && !window.confirm("替换会覆盖当前词库和设置。确认继续？")) return;
-      if (!merge) this.state().storageClear();
-      if (parsed.storage && typeof parsed.storage === "object") this.state().storageSet(parsed.storage);
+      if (!merge && !window.confirm("Replace the current LingKuma learning database? Zotero settings and credentials will remain unchanged.")) return;
       if (parsed.words || parsed.wordDetails || parsed.vocabulary || parsed.data) this.state().importLingKuma(parsed, merge);
       await this.state().save();
       this.loadControls();
@@ -802,7 +1088,7 @@
 
     async webdavDownload(merge) {
       await this.saveSettings(false);
-      if (!merge && !window.confirm("下载并替换会覆盖当前 LingKuma 词库与设置。确认继续？")) return;
+      if (!merge && !window.confirm("Download and replace the current LingKuma learning database? Zotero settings and credentials will remain unchanged.")) return;
       const url = this.webdavURL();
       this.setWebdavStatus("正在下载 WebDAV 备份……");
       const xhr = await Zotero.HTTP.request("GET", url, {
@@ -811,9 +1097,7 @@
         timeout: 60000
       });
       const parsed = JSON.parse(xhr.responseText || xhr.response || "{}");
-      if (!merge) this.state().storageClear();
-      if (parsed.storage) this.state().storageSet(parsed.storage);
-      if (parsed.words) this.state().restoreWords(parsed.words, merge);
+      if (parsed.words || parsed.wordDetails || parsed.vocabulary || parsed.data) this.state().importLingKuma(parsed, merge);
       await this.state().save();
       this.loadControls();
       this.refreshWordSummary();
@@ -837,7 +1121,8 @@
       const node = document.getElementById("lk-custom-capsules");
       if (!node) return;
       const parsed = node.value.trim() ? JSON.parse(node.value) : [];
-      node.value = JSON.stringify(parsed, null, 2);
+      node.value = JSON.stringify(this.validateCustomCapsules(parsed), null, 2);
+      node.dataset.lkDirty = "true";
       this.scheduleSave();
     },
 
@@ -1015,10 +1300,11 @@
       const synth = win?.speechSynthesis;
       const Utterance = win?.SpeechSynthesisUtterance;
       if (!synth || !Utterance) throw new Error("当前系统没有可用的本地 TTS");
+      const config = this.state().storage.ttsConfig || {};
       const utterance = new Utterance("LingKuma language learning test");
-      utterance.rate = Number(this.state().storage.localTTSRate || 1);
-      utterance.pitch = Number(this.state().storage.localTTSPitch || 1);
-      const preferred = String(this.state().storage.localTTSVoice || "").toLowerCase();
+      utterance.rate = Number(config.localTTSRate || 1);
+      utterance.pitch = Number(config.localTTSPitch || 1);
+      const preferred = String(config.localTTSVoice || "").toLowerCase();
       if (preferred) utterance.voice = synth.getVoices().find(voice => voice.name.toLowerCase().includes(preferred)) || null;
       synth.cancel();
       synth.speak(utterance);
