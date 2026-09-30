@@ -38,11 +38,11 @@ For broader LingKuma usage guides and platform documentation, see the [LingKuma 
 
 Light theme with English → Chinese translation:
 
-<img src="docs/images/lingkuma-zotero-word-lookup-light.png" alt="LingKuma for Zotero light theme with Chinese translation" width="900">
+<img src="docs/images/zotero-word-lookup-light.png" alt="LingKuma for Zotero light theme with Chinese translation" width="900">
 
 Dark theme with English → Chinese translation:
 
-<img src="docs/images/lingkuma-zotero-word-lookup-dark.png" alt="LingKuma for Zotero dark theme with Chinese translation" width="900">
+<img src="docs/images/zotero-word-lookup-dark.png" alt="LingKuma for Zotero dark theme with Chinese translation" width="900">
 
 Dark theme with English → Russian translation:
 
