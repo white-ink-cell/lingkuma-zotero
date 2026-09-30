@@ -38,11 +38,11 @@ LingKuma는 아직 배우고 있는 언어로 된 콘텐츠를 읽을 수 있도
 
 라이트 테마, 영어 → 중국어 번역:
 
-<img src="docs/images/lingkuma-zotero-word-lookup-light.png" alt="LingKuma for Zotero light theme with Chinese translation" width="900">
+<img src="docs/images/zotero-word-lookup-light.png" alt="LingKuma for Zotero light theme with Chinese translation" width="900">
 
 다크 테마, 영어 → 중국어 번역:
 
-<img src="docs/images/lingkuma-zotero-word-lookup-dark.png" alt="LingKuma for Zotero dark theme with Chinese translation" width="900">
+<img src="docs/images/zotero-word-lookup-dark.png" alt="LingKuma for Zotero dark theme with Chinese translation" width="900">
 
 다크 테마, 영어 → 러시아어 번역:
 
