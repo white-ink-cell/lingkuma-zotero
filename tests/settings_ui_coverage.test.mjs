@@ -13,7 +13,8 @@ test('Zotero exposes exactly one LingKuma settings surface', () => {
   assert.equal((BOOTSTRAP.match(/PreferencePanes\.register\s*\(/g) || []).length, 1);
   assert.match(BOOTSTRAP, /src:\s*rootURI \+ "ui\/prefs\.xhtml"/);
   assert.equal((XHTML.match(/id="lingkuma-zotero-prefs-root"/g) || []).length, 1);
-  assert.doesNotMatch(MAIN, /open(?:Settings|Preferences)|menuitem[^\n]*(?:Settings|设置)/i);
+  assert.equal((MAIN.match(/\.openPreferences\s*\(/g) || []).length, 1);
+  assert.doesNotMatch(MAIN, /menuitem[^\n]*(?:Settings|设置)/i);
   assert.doesNotMatch(XHTML, /<(?:html:)?iframe\b|data-lk-action="open-(?:settings|preferences)"/i);
 });
 

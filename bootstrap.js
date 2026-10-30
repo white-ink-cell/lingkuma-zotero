@@ -49,7 +49,7 @@ async function startup({ id, version, rootURI }, reason) {
       return;
     }
     try {
-      await Zotero.PreferencePanes.register({
+      instance.preferencePaneID = await Zotero.PreferencePanes.register({
         pluginID: id,
         src: rootURI + "ui/prefs.xhtml",
         scripts: [rootURI + "ui/prefs.js"],

@@ -375,6 +375,7 @@
       }
 
       this.bindNavigation();
+      this.bindPreferenceActions();
       this.bindControls();
       this.bindActions();
       this.loadControls();
@@ -405,6 +406,22 @@
       for (const button of document.querySelectorAll("[data-lk-page]")) {
         button.addEventListener("click", () => this.showPage(button.dataset.lkPage));
       }
+    },
+
+    consumePreferenceAction() {
+      const action = window.Zotero_Preferences?.consumePendingAction?.();
+      if (action !== "import") return false;
+      this.showPage("import");
+      return true;
+    },
+
+    bindPreferenceActions() {
+      this.preferenceActionHandler ||= () => this.consumePreferenceAction();
+      document.addEventListener("action", this.preferenceActionHandler, true);
+      document.getElementById("lingkuma-zotero-prefs-root")?.addEventListener("unload", () => {
+        document.removeEventListener("action", this.preferenceActionHandler, true);
+      }, { once: true });
+      this.consumePreferenceAction();
     },
 
     showPage(page) {

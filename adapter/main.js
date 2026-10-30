@@ -71,6 +71,7 @@ class LingKumaZoteroPlugin {
     this._lifecycleGeneration = 0;
     this.audioElement = null;
     this.speechUtterance = null;
+    this.preferencePaneID = null;
     this.lastDiagnostic = "尚未扫描阅读器";
   }
 
@@ -755,18 +756,11 @@ class LingKumaZoteroPlugin {
       {}
     );
     if (choice === 0) {
-      const input = { value: "" };
-      const ok = ps.prompt(win, "导入 LingKuma JSON", "粘贴导出的 JSON 内容：", input, null, {});
-      if (!ok || !input.value.trim()) return;
-      try {
-        const imported = this.state.importLingKuma(input.value, true);
-        await this.state.save();
-        this.host.broadcast({ action: "customWordUpdated" });
-        this.showMessage("LingKuma", `已导入/合并 ${imported} 个词条。`, win);
-        this.scanAllReaders("vocabulary-import", true);
-      } catch (error) {
-        this.showMessage("LingKuma", `导入失败：${error?.message || error}`, win);
+      if (!this.preferencePaneID) {
+        this.showMessage("LingKuma", "导入页面尚未就绪，请稍后重试。", win);
+        return;
       }
+      Zotero.Utilities.Internal.openPreferences(this.preferencePaneID, { action: "import" });
     } else if (choice === 1) {
       const json = JSON.stringify(this.state.exportData(), null, 2);
       try {
