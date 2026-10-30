@@ -118,3 +118,63 @@ test('the preference pane consumes import actions on first and repeated navigati
   rootHandlers.get('unload')();
   assert.equal(documentHandlers.has('action'), false);
 });
+
+const loadImportPrefs = ({ raw, state, scanAllReaders }) => {
+  const nodes = {
+    'lk-import-text': { value: raw },
+    'lk-import-mode': { value: 'replace' },
+    'lk-import-status': { value: '5' },
+    'lk-import-language': { value: 'en' },
+    'lk-import-custom-language': { value: '' },
+  };
+  const context = vm.createContext({
+    window: {},
+    document: { getElementById(id) { return nodes[id] || null; } },
+    navigator: {},
+    NodeFilter: { SHOW_TEXT: 4 },
+    Zotero: { locale: 'en-US' },
+  });
+  vm.runInContext(read('ui/prefs.js'), context, { filename: 'ui/prefs.js' });
+  const prefs = context.window.LingKumaZoteroPrefs;
+  prefs.state = () => state;
+  prefs.plugin = () => ({ scanAllReaders });
+  prefs.refreshWordSummary = () => {};
+  prefs.renderWordList = () => {};
+  prefs.renderStatistics = () => {};
+  prefs.status = () => {};
+  return prefs;
+};
+
+test('a successful native import saves before refreshing open readers exactly once', async () => {
+  const calls = [];
+  const state = {
+    importLingKuma(payload, merge) { calls.push(['import', payload, merge]); return 2; },
+    async save() { calls.push(['save']); },
+  };
+  const prefs = loadImportPrefs({
+    raw: JSON.stringify({ alpha: { word: 'alpha', status: '1' }, data: { word: 'data', status: '5' } }),
+    state,
+    scanAllReaders: (...args) => calls.push(['scan', ...args]),
+  });
+
+  await prefs.importWords();
+
+  assert.deepEqual(calls.map(item => item[0]), ['import', 'save', 'scan']);
+  assert.equal(calls[0][2], false);
+  assert.deepEqual(calls[2], ['scan', 'native-settings-import', true]);
+});
+
+test('a failed native import save never refreshes readers as if it succeeded', async () => {
+  let scans = 0;
+  const prefs = loadImportPrefs({
+    raw: JSON.stringify({ alpha: { word: 'alpha', status: '1' } }),
+    state: {
+      importLingKuma() { return 1; },
+      async save() { throw new Error('save failed'); },
+    },
+    scanAllReaders: () => { scans++; },
+  });
+
+  await assert.rejects(() => prefs.importWords(), /save failed/);
+  assert.equal(scans, 0);
+});
