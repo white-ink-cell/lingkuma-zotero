@@ -235,6 +235,21 @@ function lkNormalizeRecord(word, raw = {}) {
   return rec;
 }
 
+function lkIsWordRecord(value) {
+  return value && typeof value === "object" && !Array.isArray(value) && (
+    [value.word, value.term, value.value].some(item => typeof item === "string") ||
+    ["status", "statusHistory", "translations", "tags", "sentences"].some(key =>
+      Object.prototype.hasOwnProperty.call(value, key))
+  );
+}
+
+function lkIsWordCollection(value) {
+  return Array.isArray(value)
+    ? value.every(item => typeof item === "string" || lkIsWordRecord(item))
+    : value && typeof value === "object" && !lkIsWordRecord(value) &&
+      Object.values(value).every(lkIsWordRecord);
+}
+
 function lkMergeRecords(localRaw, remoteRaw, word) {
   const local = lkNormalizeRecord(word, localRaw || {});
   const remote = lkNormalizeRecord(word, remoteRaw || {});
@@ -806,7 +821,7 @@ class LingKumaStateAdapter {
   }
 
   restoreWords(rawData, merge = false) {
-    const source = rawData?.words && typeof rawData.words === "object" ? rawData.words : rawData;
+    const source = lkIsWordCollection(rawData?.words) ? rawData.words : rawData;
     if (!source || typeof source !== "object") throw new Error("无法识别词汇数据格式");
     if (!merge) this.words = {};
     let count = 0;
@@ -825,7 +840,19 @@ class LingKumaStateAdapter {
   importLingKuma(rawData, merge = true) {
     const parsed = typeof rawData === "string" ? JSON.parse(rawData) : rawData;
     if (!parsed || typeof parsed !== "object") throw new Error("JSON 内容无效");
-    const candidates = parsed.words || parsed.wordDetails || parsed.vocabulary || parsed.data || parsed;
+    const knownExport = ["lingkuma-zotero-export", "lingkuma-calibre-learning-export"].includes(parsed.format);
+    let candidates = parsed;
+    if (knownExport) {
+      if (!lkIsWordCollection(parsed.words)) throw new Error("无法识别词汇数据格式");
+      candidates = parsed.words;
+    } else {
+      for (const key of ["words", "wordDetails", "vocabulary", "data"]) {
+        if (Object.prototype.hasOwnProperty.call(parsed, key) && lkIsWordCollection(parsed[key])) {
+          candidates = parsed[key];
+          break;
+        }
+      }
+    }
     if (Array.isArray(candidates)) {
       const map = {};
       for (const item of candidates) {
