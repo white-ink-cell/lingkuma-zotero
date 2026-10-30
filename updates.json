@@ -3,9 +3,8 @@
     "lingkuma-zotero@white-ink-cell": {
       "updates": [
         {
-          "version": "1.1.0",
-          "update_link": "https://github.com/white-ink-cell/lingkuma-zotero/releases/download/v1.1.0/lingkuma-zotero-1.1.0.xpi",
-          "update_hash": "sha256:d2753a40ccb5826246b81aadc70cbb7d5f65761245e6caeb4d7669a55e8115b2",
+          "version": "1.1.1",
+          "update_link": "https://github.com/white-ink-cell/lingkuma-zotero/releases/download/v1.1.1/lingkuma-zotero-1.1.1.xpi",
           "applications": {
             "zotero": {
               "strict_min_version": "9.0",

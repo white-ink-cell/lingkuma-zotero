@@ -117,7 +117,7 @@ class PackageContracts(unittest.TestCase):
         manifest = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
         zotero = manifest["applications"]["zotero"]
         self.assertEqual(manifest["author"], EXPECTED_MANIFEST_AUTHOR)
-        self.assertEqual(manifest["version"], "1.1.0")
+        self.assertEqual(manifest["version"], "1.1.1")
         self.assertEqual(zotero["id"], "lingkuma-zotero@white-ink-cell")
         self.assertEqual(
             zotero["update_url"],
@@ -128,15 +128,12 @@ class PackageContracts(unittest.TestCase):
 
         updates = json.loads((ROOT / "updates.json").read_text(encoding="utf-8"))
         entry = updates["addons"][zotero["id"]]["updates"][0]
-        self.assertEqual(entry["version"], "1.1.0")
+        self.assertEqual(entry["version"], "1.1.1")
         self.assertEqual(
             entry["update_link"],
-            "https://github.com/white-ink-cell/lingkuma-zotero/releases/download/v1.1.0/lingkuma-zotero-1.1.0.xpi",
+            "https://github.com/white-ink-cell/lingkuma-zotero/releases/download/v1.1.1/lingkuma-zotero-1.1.1.xpi",
         )
-        self.assertEqual(
-            entry["update_hash"],
-            "sha256:d2753a40ccb5826246b81aadc70cbb7d5f65761245e6caeb4d7669a55e8115b2",
-        )
+        self.assertNotIn("update_hash", entry)
         published_zotero = entry["applications"]["zotero"]
         self.assertEqual(published_zotero["strict_min_version"], "9.0")
         self.assertEqual(published_zotero["strict_max_version"], "10.0.*")
@@ -240,6 +237,32 @@ class PackageContracts(unittest.TestCase):
             with self.subTest(path=relative):
                 text = (ROOT / relative).read_text(encoding="utf-8")
                 self.assertIn("Zotero 10.0.x", text)
+
+    def test_readmes_describe_the_same_v1_1_1_json_import_fix(self) -> None:
+        expected = {
+            "README.md": (
+                "## Fixed in v1.1.1",
+                "complete JSON file or paste the full multiline content without a line limit",
+            ),
+            "README_zh.md": (
+                "## v1.1.1 修复",
+                "完整 JSON 文件，或一次性粘贴不限行数的完整多行内容",
+            ),
+            "README_ja.md": (
+                "## v1.1.1 の修正",
+                "JSON ファイル全体を読み込むか、行数制限なしで複数行の内容全体を一度に貼り付ける",
+            ),
+            "README_ko.md": (
+                "## v1.1.1 수정",
+                "전체 JSON 파일을 가져오거나 줄 수 제한 없이 여러 줄의 전체 내용을 한 번에 붙여넣을",
+            ),
+        }
+        for relative, snippets in expected.items():
+            with self.subTest(path=relative):
+                text = (ROOT / relative).read_text(encoding="utf-8")
+                self.assertIn("lingkuma-zotero-1.1.1.xpi", text)
+                for snippet in snippets:
+                    self.assertIn(snippet, text)
 
 
 if __name__ == "__main__":

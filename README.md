@@ -63,6 +63,10 @@ The Zotero port adds:
 - Integration with Zotero's built-in PDF / EPUB reading environment
 - A native LingKuma settings page inside Zotero
 
+## Fixed in v1.1.1
+
+Fixed vocabulary JSON import so users can import a complete JSON file or paste the full multiline content without a line limit, while preserving imported highlight states.
+
 ## What's new in v1.1.0?
 
 ### Zotero 10 compatibility
@@ -160,7 +164,7 @@ As a result, the largest speed and accuracy improvement in this release is for *
 
 ## Installation
 
-1. Download `lingkuma-zotero-1.1.0.xpi` from **GitHub Releases**.
+1. Download `lingkuma-zotero-1.1.1.xpi` from **GitHub Releases**.
 2. Open **Zotero → Tools → Plugins**.
 3. Use **Install Add-on From File** (or drag the `.xpi` into the Plugins window).
 4. Select the downloaded `.xpi` file.

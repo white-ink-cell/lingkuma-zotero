@@ -63,6 +63,10 @@ Zotero 移植版增加了：
 - 与 Zotero 内置 PDF / EPUB 阅读环境集成
 - 集成在 Zotero 内的 LingKuma 原生设置页面
 
+## v1.1.1 修复
+
+修复词汇 JSON 导入：现在可以导入完整 JSON 文件，或一次性粘贴不限行数的完整多行内容，并保留导入数据对应的高亮状态。
+
 ## v1.1.0 本次更新
 
 ### 更新 Zotero 10 兼容性
@@ -160,7 +164,7 @@ LingKuma 原项目仍然是多语言工具，但这次新增的**本地字典加
 
 ## 安装
 
-1. 从 **GitHub Releases** 下载 `lingkuma-zotero-1.1.0.xpi`。
+1. 从 **GitHub Releases** 下载 `lingkuma-zotero-1.1.1.xpi`。
 2. 打开 **Zotero → 工具 → 插件**。
 3. 使用 **从文件安装插件**（也可以直接将 `.xpi` 拖入插件窗口）。
 4. 选择下载的 `.xpi` 文件。
